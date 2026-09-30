@@ -11,14 +11,19 @@
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <circle cx="256" cy="262" r="176" fill="url(#rim)"/>
-  <circle cx="256" cy="252" r="176" fill="url(#gold)"/>
-  <circle cx="256" cy="252" r="146" fill="none" stroke="#241a00" stroke-opacity=".18" stroke-width="6"/>
-  <g fill="#241a00">
-    <rect x="164" y="262" width="44" height="72" rx="10"/>
-    <rect x="234" y="222" width="44" height="112" rx="10"/>
-    <rect x="304" y="176" width="44" height="158" rx="10"/>
+  <!-- sombra / canto de la bolsa -->
+  <path d="M206 168 C120 222 92 300 104 360 C116 424 172 450 256 450 C340 450 396 424 408 360 C420 300 392 222 306 168 Z" fill="url(#rim)" transform="translate(0 10)"/>
+  <!-- cuerpo de la bolsa -->
+  <path d="M206 168 C120 222 92 300 104 360 C116 424 172 450 256 450 C340 450 396 424 408 360 C420 300 392 222 306 168 Z" fill="url(#gold)"/>
+  <!-- cuello y copete -->
+  <path d="M186 96 C200 70 226 84 238 72 C248 62 264 62 274 72 C286 84 312 70 326 96 C334 112 320 128 306 134 L206 134 C192 128 178 112 186 96 Z" fill="url(#gold)"/>
+  <!-- cuerda -->
+  <rect x="192" y="132" width="128" height="40" rx="20" fill="#241a00"/>
+  <path d="M300 152 C340 140 360 160 352 186" fill="none" stroke="#241a00" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="352" cy="192" r="11" fill="#241a00"/>
+  <!-- símbolo € -->
+  <g fill="none" stroke="#241a00" stroke-width="28" stroke-linecap="round">
+    <path d="M318 262 A74 74 0 1 0 318 382"/>
+    <path d="M184 300 H280 M184 344 H270"/>
   </g>
-  <path d="M160 214 L236 158 L276 186 L338 132" fill="none" stroke="#241a00" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M304 124 L352 120 L348 168 Z" fill="#241a00" stroke="#241a00" stroke-width="8" stroke-linejoin="round"/>
 </svg>
