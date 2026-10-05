@@ -248,20 +248,15 @@ const NOW = new Date();
 const YEAR_NOW = NOW.getFullYear(), MONTH_NOW = NOW.getMonth(), DAY_NOW = NOW.getDate();
 
 /* ── qué interfaz mostrar ──
-   Manda tu preferencia guardada; si no hay, se decide por el aparato:
-   pantalla táctil Y dispositivo estrecho = móvil. El ancho de la ventana
-   NO cuenta, porque la página puede abrirse en un panel estrecho. */
+   Solo lo decide el aparato: móvil (pantalla táctil y estrecha) = app de
+   móvil; ordenador = dashboard completo. No se guarda ninguna preferencia. */
 const VISTA_KEY = "tracker:dividendos:vista";
-let VISTA_PREF = null;
-try { VISTA_PREF = localStorage.getItem(VISTA_KEY); } catch (e) {}
-const _q = (location.search.match(/vista=(movil|dashboard)/) || [])[1];
-if (_q) { VISTA_PREF = _q; try { localStorage.setItem(VISTA_KEY, _q); } catch (e) {} }
+try { localStorage.removeItem(VISTA_KEY); } catch (e) {}   // borra la preferencia antigua
 const _tactil = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
 const _pantalla = (window.screen && window.screen.width)
   ? Math.min(window.screen.width, window.screen.height) : 1200;
-const MOBILE = (VISTA_PREF === "movil" || VISTA_PREF === "dashboard")
-  ? VISTA_PREF === "movil"
-  : (_tactil && _pantalla < 700);
+const _uaMovil = /Android.+Mobile|iPhone|iPod|Windows Phone/i.test(navigator.userAgent || "");
+const MOBILE = _uaMovil || (_tactil && _pantalla < 700);
 function setVista(x) {
   try { localStorage.setItem(VISTA_KEY, x); } catch (e) {}
   location.reload();
@@ -2017,8 +2012,6 @@ function sheetCfg() {
       '<div class="seg mode" style="width:100%;display:flex">' +
       '<button style="flex:1" data-act="modo" data-v="neto" class="' + (S.mode === "neto" ? "on" : "") + '">Neto</button>' +
       '<button style="flex:1" data-act="modo" data-v="bruto" class="' + (S.mode === "bruto" ? "on" : "") + '">Bruto</button></div></div>' +
-    '<div class="fg"><label>Interfaz</label>' +
-      '<button class="btn gho" style="margin-top:0" data-act="vista" data-v="dashboard">🖥 Ver el dashboard completo</button></div>' +
     '<div class="ctitle" style="margin:22px 0 10px">Pasar los datos al dashboard</div>' +
     '<textarea class="io" id="io-out" readonly>' + esc(JSON.stringify(payload())) + '</textarea>' +
     '<button class="btn gho" data-act="copiar" style="margin:0 0 10px">⧉ Copiar mis datos</button>' +
@@ -2700,7 +2693,6 @@ const HTML_DESK = `<header class="header">
       <button data-mode="neto">Neto</button>
       <button data-mode="bruto">Bruto</button>
     </div>
-    <button class="btn-ghost" id="btn-vista" title="Ver la app de móvil">📱</button>
     <button class="btn-ghost" id="btn-fs" title="Pantalla completa (F)">⛶</button>
     <button class="btn-ghost" id="btn-data">⇅ Datos</button>
     <button class="btn-primary solo" id="btn-new" title="Nuevo dividendo" aria-label="Nuevo dividendo">＋</button>
@@ -2764,8 +2756,6 @@ function arrancar() {
   const st2 = document.createElement("style"); st2.textContent = FILE_PICK_CSS; document.head.appendChild(st2);
   loadLocal();
   if (MOBILE) initMobile(); else initDesktop();
-  const bv = document.getElementById("btn-vista");
-  if (bv) bv.addEventListener("click", () => setVista("movil"));
   syncBadge();
   initSync();
 }
