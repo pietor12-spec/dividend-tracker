@@ -380,6 +380,42 @@ function payload() {
     cats: S.cats, mode: S.mode, deleted: S.deleted, goal: S.goal };
 }
 const exportPayload = () => JSON.stringify(payload());
+/* ---------- copia en archivo .json ---------- */
+function descargarJSON() {
+  try {
+    const f = new Date(), dd = (n) => String(n).padStart(2, "0");
+    const nombre = "dividendos-" + f.getFullYear() + "-" + dd(f.getMonth() + 1) + "-" + dd(f.getDate()) + ".json";
+    const blob = new Blob([JSON.stringify(payload(), null, 1)], { type: "application/json" });
+    const url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = nombre; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+    toast("Archivo guardado: " + nombre);
+  } catch (e) { toast("No se pudo guardar el archivo"); }
+}
+/* botón "Elegir un archivo .json": una <label> con el input dentro, así el
+   selector de archivos se abre de forma nativa también en el móvil */
+const FILE_PICK = '<label class="file-pick">📂 Elegir un archivo .json' +
+  '<input type="file" id="io-file" accept=".json,application/json,text/plain" style="display:none"></label>';
+const FILE_PICK_CSS = '.file-pick{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;box-sizing:border-box;' +
+  'padding:16px;margin:0 0 12px;border:1.5px dashed #22d3ee;border-radius:14px;background:rgba(34,211,238,.08);' +
+  'color:#22d3ee;font-weight:700;font-size:15px;cursor:pointer;font-family:inherit}.file-pick:active{opacity:.7}';
+document.addEventListener("change", function (e) {
+  const inp = e.target;
+  if (!inp || inp.id !== "io-file" || !inp.files || !inp.files[0]) return;
+  const rd = new FileReader();
+  rd.onload = function () {
+    const ta = el("io-in");
+    if (ta) ta.value = String(rd.result || "");
+    inp.value = "";
+    try { const d = JSON.parse(ta.value); if (!d || !Array.isArray(d.pays)) throw 0; }
+    catch (x) { toast("Ese archivo no es una copia del tracker"); return; }
+    const btn = document.querySelector('[data-act="importar"],[data-act="import-data"]');
+    if (btn) accionImportar(btn.dataset.act);
+  };
+  rd.onerror = function () { toast("No se pudo leer el archivo"); };
+  rd.readAsText(inp.files[0]);
+});
+let accionImportar = function () {};
 /* Lo que llega de la nube viene congelado por el sistema: hay que quedarse
    con una copia propia, o cualquier intento de añadir un cobro falla. */
 function clonar(x) { try { return JSON.parse(JSON.stringify(x)); } catch (e) { return x; } }
@@ -1348,12 +1384,13 @@ function saveComp() {
 function openDataModal() {
   document.getElementById("modal-data").innerHTML =
     '<div class="modal-title"><span>Exportar / Importar datos</span><button class="modal-x" data-act="close-modal">✕</button></div>' +
-    '<div class="note" style="margin-bottom:14px">Para pasar tus datos entre el móvil y el ordenador: en un dispositivo pulsa <b>Copiar</b>, y en el otro pega el texto abajo y pulsa <b>Importar</b>. Importar reemplaza los datos de este dispositivo.</div>' +
+    '<div class="note" style="margin-bottom:14px">Para pasar tus datos entre el móvil y el ordenador: en un dispositivo pulsa <b>Copiar</b> o <b>Guardar .json</b>, y en el otro pega el texto o elige el archivo. Importar reemplaza los datos de este dispositivo.</div>' +
     '<div class="kpi-label" style="margin-bottom:6px">1 · Exportar</div>' +
     '<textarea class="data-io" id="io-out" readonly>' + esc(exportPayload()) + '</textarea>' +
-    '<button class="btn-ghost" style="width:100%;justify-content:center;margin:8px 0 18px" data-act="copy-data">⧉ Copiar</button>' +
-    '<div class="kpi-label" style="margin-bottom:6px">2 · Importar</div>' +
-    '<textarea class="data-io" id="io-in" placeholder="Pega aquí el texto copiado…" style="color:var(--text)"></textarea>' +
+    '<button class="btn-ghost" style="width:100%;justify-content:center;margin:8px 0 8px" data-act="copy-data">⧉ Copiar</button>' +
+    '<button class="btn-ghost" style="width:100%;justify-content:center;margin:0 0 18px" data-act="save-json">⬇ Guardar .json</button>' +
+    '<div class="kpi-label" style="margin-bottom:6px">2 · Importar</div>' + FILE_PICK +
+    '<textarea class="data-io" id="io-in" placeholder="…o pega aquí el texto copiado" style="color:var(--text)"></textarea>' +
     '<div class="modal-actions"><button class="btn-cancel" data-act="close-modal">Cerrar</button>' +
       '<button class="btn-save" data-act="import-data">⬇ Importar</button></div>';
   document.getElementById("ov-data").classList.add("open");
@@ -1495,6 +1532,7 @@ document.addEventListener("click", (e) => {
       .then(() => toast("Copiado")).catch(() => { try { document.execCommand("copy"); toast("Copiado"); } catch (x) { toast("Selecciona y copia a mano"); } });
     return; }
   if (a === "import-data") { importData(); return; }
+  if (a === "save-json") { descargarJSON(); return; }
 });
 
 /* ---------- navegación lateral ---------- */
@@ -1549,6 +1587,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal
 
 
 repaint = renderAll;
+accionImportar = importData;
 renderAll();
 }
 
@@ -1982,9 +2021,10 @@ function sheetCfg() {
       '<button class="btn gho" style="margin-top:0" data-act="vista" data-v="dashboard">🖥 Ver el dashboard completo</button></div>' +
     '<div class="ctitle" style="margin:22px 0 10px">Pasar los datos al dashboard</div>' +
     '<textarea class="io" id="io-out" readonly>' + esc(JSON.stringify(payload())) + '</textarea>' +
-    '<button class="btn gho" data-act="copiar" style="margin:0 0 18px">⧉ Copiar mis datos</button>' +
-    '<label style="display:block;font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Importar</label>' +
-    '<textarea class="io" id="io-in" placeholder="Pega aquí el texto copiado del ordenador…"></textarea>' +
+    '<button class="btn gho" data-act="copiar" style="margin:0 0 10px">⧉ Copiar mis datos</button>' +
+    '<button class="btn gho" data-act="save-json" style="margin:0 0 18px">⬇ Guardar .json</button>' +
+    '<label style="display:block;font-size:9.5px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:7px">Importar</label>' + FILE_PICK +
+    '<textarea class="io" id="io-in" placeholder="…o pega aquí el texto copiado del ordenador"></textarea>' +
     '<button class="btn gho" data-act="importar">⬇ Importar y reemplazar</button>' +
     '<button class="btn gho" data-act="cerrar">Cerrar</button>');
 }
@@ -2045,6 +2085,7 @@ function accion(t) {
     (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.reject())
       .then(() => toast("Datos copiados")).catch(() => { try { document.execCommand("copy"); toast("Datos copiados"); }
       catch (x) { toast("Selecciona el texto y cópialo"); } }); return; }
+  if (a === "save-json") { descargarJSON(); return; }
   if (a === "importar") { try {
       const d = JSON.parse(el("io-in").value);
       if (!d || !Array.isArray(d.pays)) throw new Error();
@@ -2086,6 +2127,7 @@ el("ov").addEventListener("click", closeSheet);
 
 
 repaint = render;
+accionImportar = function () { accion({ dataset: { act: "importar" } }); };
 render();
 }
 
@@ -2719,6 +2761,7 @@ function arrancar() {
   st.textContent = MOBILE ? CSS_MOB : CSS_DESK;
   document.head.appendChild(st);
   document.body.innerHTML = MOBILE ? HTML_MOB : HTML_DESK;
+  const st2 = document.createElement("style"); st2.textContent = FILE_PICK_CSS; document.head.appendChild(st2);
   loadLocal();
   if (MOBILE) initMobile(); else initDesktop();
   const bv = document.getElementById("btn-vista");
