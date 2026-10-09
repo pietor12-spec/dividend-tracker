@@ -368,7 +368,7 @@ function comps() {
 /* ══════════════════════════════════════════════════════════════
    ALMACENAMIENTO · nube compartida con respaldo local
    ══════════════════════════════════════════════════════════════ */
-const SYNC = { mode: "local", doc: null, rev: 0, error: null };
+const SYNC = { mode: "local", doc: null, rev: 0, error: null, last: null };
 const VERSION = "1.6";
 function payload() {
   return { v: 3, pays: S.pays, currency: S.currency, sold: S.sold, overrides: S.overrides,
@@ -432,11 +432,19 @@ function applyState(d0) {
 function mergeRemote(d) {
   if (!d || !Array.isArray(d.pays)) return false;
   const remotos = new Set(d.pays.map(p => p.id));
-  const borrados = new Set(d.deleted || []);
-  const propios = S.pays.filter(p => !remotos.has(p.id) && !borrados.has(p.id)).map(clonar);
+  const borrRem = new Set(d.deleted || []);
+  const borrLoc = (S.deleted || []).filter(id => !borrRem.has(id));   // borrados aquí que la nube no sabe
+  const propios = S.pays.filter(p => !remotos.has(p.id) && !borrRem.has(p.id)).map(clonar);
   applyState(d);
-  if (propios.length) { S.pays = S.pays.concat(propios); return true; }
-  return false;
+  let cambio = false;
+  if (borrLoc.length) {
+    const bl = new Set(borrLoc);
+    S.pays = S.pays.filter(p => !bl.has(p.id));
+    S.deleted = S.deleted.concat(borrLoc);
+    cambio = true;
+  }
+  if (propios.length) { S.pays = S.pays.concat(propios); cambio = true; }
+  return cambio;
 }
 const UI_KEYS = ["yieldBasis","empFilter","empSort","empDir","empGainMode","pesoLimit","pesoBasis",
   "prevGrowthMode","prevGrowth","prevGoal","tab"];
@@ -494,14 +502,182 @@ function syncBadge() {
   if (!b) return;
   const ok = SYNC.mode === "cloud";
   b.className = "sync " + (ok ? "ok" : "local");
-  b.innerHTML = '<i></i>' + (ok ? "Sincronizado" : "Solo este dispositivo");
+  b.innerHTML = '<i></i>' + (ok ? (SYNC.error ? "Error al sincronizar" : "Sincronizado") : "Solo este dispositivo");
 }
+/* ══════════════════════════════════════════════════════════════
+   SINCRONIZACIÓN CON GITHUB · un Gist privado en tu cuenta
+   Misma interfaz que la nube de antes: get() / set() / onSnapshot()
+   ══════════════════════════════════════════════════════════════ */
+const GH = {
+  TK: "tracker:dividendos:gh-token", GK: "tracker:dividendos:gh-gist",
+  FILE: "dividend-tracker.json", API: "https://api.github.com",
+  id: null, etag: null, last: "", pend: null, waiters: [], t: null, poll: null, cb: null,
+  token() { try { return localStorage.getItem(this.TK) || ""; } catch (e) { return ""; } },
+  api(path, opt) {
+    opt = opt || {};
+    const h = Object.assign({ "Authorization": "Bearer " + this.token(), "Accept": "application/vnd.github+json" }, opt.headers || {});
+    return fetch(this.API + path, Object.assign({ cache: "no-store" }, opt, { headers: h }));
+  },
+  async fail(r) {
+    if (r.status === 401) throw new Error("La clave de GitHub no es válida o ha caducado");
+    if (r.status === 403 || r.status === 404) throw new Error("La clave no tiene permiso «gist»");
+    throw new Error("GitHub respondió " + r.status);
+  },
+  async contenido(j) {
+    const f = j && j.files && j.files[this.FILE];
+    if (!f) return null;
+    const txt = f.truncated ? await fetch(f.raw_url, { cache: "no-store" }).then(r => r.text()) : f.content;
+    try { return JSON.parse(txt); } catch (e) { return null; }
+  },
+  async buscar() {
+    let id = null;
+    try { id = localStorage.getItem(this.GK); } catch (e) {}
+    if (id) { const r = await this.api("/gists/" + id); if (r.ok) return id; if (r.status === 401) return this.fail(r); }
+    for (let page = 1; page <= 10; page++) {
+      const r = await this.api("/gists?per_page=100&page=" + page);
+      if (!r.ok) return this.fail(r);
+      const l = await r.json();
+      const g = l.find(x => x.files && x.files[this.FILE]);
+      if (g) return g.id;
+      if (l.length < 100) break;
+    }
+    const d = payload(); d.rev = Date.now();
+    const r = await this.api("/gists", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ description: "Dividend Tracker · datos (no borrar)", public: false,
+        files: { [this.FILE]: { content: JSON.stringify(d) } } }) });
+    if (!r.ok) return this.fail(r);
+    return (await r.json()).id;
+  },
+  async leer(soloSiCambia) {
+    const h = (soloSiCambia && this.etag) ? { "If-None-Match": this.etag } : {};
+    const r = await this.api("/gists/" + this.id, { headers: h });
+    if (r.status === 304) return { igual: true };
+    if (!r.ok) return this.fail(r);
+    this.etag = r.headers.get("ETag") || null;
+    const d = await this.contenido(await r.json());
+    SYNC.last = new Date(); SYNC.error = null;
+    const txt = JSON.stringify(d);
+    const igual = txt === this.last; this.last = txt;
+    return { d: d, igual: igual };
+  },
+  escribir(obj) {
+    this.pend = obj;
+    clearTimeout(this.t);
+    const p = new Promise((res, rej) => this.waiters.push({ res: res, rej: rej }));
+    this.t = setTimeout(() => this.vaciar(), 1200);
+    return p;
+  },
+  async vaciar(keepalive) {
+    clearTimeout(this.t);
+    if (!this.pend) return;
+    const obj = this.pend, ws = this.waiters;
+    this.pend = null; this.waiters = [];
+    const txt = JSON.stringify(obj);
+    const body = JSON.stringify({ files: { [this.FILE]: { content: txt } } });
+    try {
+      const r = await this.api("/gists/" + this.id, { method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: body, keepalive: !!keepalive && body.length < 60000 });
+      if (!r.ok) await this.fail(r);
+      this.last = txt; this.etag = null;
+      SYNC.last = new Date(); SYNC.error = null; syncBadge();
+      ws.forEach(w => w.res());
+    } catch (e) { SYNC.error = e.message; syncBadge(); ws.forEach(w => w.rej(e)); }
+  },
+  async sondear() {
+    if (!this.cb || this.pend || document.hidden) return;
+    try {
+      const x = await this.leer(true);
+      if (!x.igual && x.d) this.cb({ exists: true, data: () => x.d });
+      syncBadge();
+    } catch (e) { SYNC.error = e.message; syncBadge(); }
+  },
+  async doc() {
+    this.id = await this.buscar();
+    try { localStorage.setItem(this.GK, this.id); } catch (e) {}
+    const self = this;
+    return {
+      async get() { const x = await self.leer(false); return { exists: !!x.d, data: () => x.d }; },
+      set(obj) { return self.escribir(obj); },
+      onSnapshot(cb) {
+        self.cb = cb;
+        clearInterval(self.poll);
+        self.poll = setInterval(() => self.sondear(), 30000);
+      }
+    };
+  },
+  parar() { clearInterval(this.poll); this.poll = null; this.cb = null; this.id = null; this.etag = null; this.last = ""; }
+};
+document.addEventListener("visibilitychange", () => {
+  if (!GH.id) return;
+  if (document.hidden) GH.vaciar(true); else GH.sondear();
+});
+window.addEventListener("focus", () => { if (GH.id) GH.sondear(); });
+
+/* panel de Ajustes / Datos */
+function ghPanel(movil) {
+  const conectado = SYNC.mode === "cloud" && GH.id;
+  const btn = movil ? "btn gho" : "btn-ghost", st = movil ? "" : "width:100%;justify-content:center;margin:0 0 8px;";
+  const hora = SYNC.last ? SYNC.last.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" }) : "—";
+  let h = '<div class="gh-box"><div class="gh-tit">☁ Sincronizar con GitHub</div>';
+  if (conectado) {
+    h += '<div class="sync ok" style="margin:6px 0 10px"><i></i> Sincronizado · última vez ' + hora + '</div>' +
+      '<div class="gh-note">Lo que guardes aquí aparece en tus otros dispositivos conectados con la misma clave.</div>' +
+      (SYNC.error ? '<div class="gh-err">' + esc(SYNC.error) + '</div>' : "") +
+      '<button class="' + btn + '" style="' + st + '" data-act="gh-sync">⟳ Sincronizar ahora</button>' +
+      '<button class="' + btn + '" style="' + st + '" data-act="gh-off">Desconectar este dispositivo</button>';
+  } else {
+    h += '<div class="gh-note">Guarda tus datos en un archivo privado (Gist) de tu cuenta de GitHub para tenerlos iguales en el móvil y en el ordenador.</div>' +
+      '<ol class="gh-steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=Dividend%20Tracker" target="_blank" rel="noopener">Crea una clave en GitHub ↗</a>: deja marcado <b>gist</b>, en <b>Expiration</b> elige <b>No expiration</b> y pulsa <b>Generate token</b>.</li>' +
+      '<li>Copia la clave (empieza por <code>ghp_</code>) y pégala aquí. Usa la misma en todos tus dispositivos.</li></ol>' +
+      '<input id="gh-token" class="gh-in" type="password" autocomplete="off" placeholder="ghp_…">' +
+      (SYNC.error ? '<div class="gh-err">' + esc(SYNC.error) + '</div>' : "") +
+      '<button class="' + (movil ? "btn pri" : "btn-save") + '" style="' + st + 'width:100%" data-act="gh-on">Conectar</button>';
+  }
+  return h + '</div>';
+}
+const GH_CSS = '.gh-box{border:1px solid rgba(34,211,238,.35);border-radius:14px;padding:14px;margin:14px 0 18px;background:rgba(34,211,238,.05)}' +
+  '.gh-tit{font-weight:800;font-size:14px;color:#22d3ee;margin-bottom:6px}.gh-note{font-size:12.5px;line-height:1.5;opacity:.85;margin-bottom:10px}' +
+  '.gh-steps{font-size:12.5px;line-height:1.55;padding-left:18px;margin:0 0 12px}.gh-steps a{color:#ffd740;font-weight:700}' +
+  '.gh-steps code{font-family:"JetBrains Mono",monospace;font-size:11.5px}.gh-err{color:#ff6b6b;font-size:12px;margin:0 0 10px}' +
+  '.gh-in{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.15);background:rgba(0,0,0,.25);' +
+  'color:inherit;font-family:"JetBrains Mono",monospace;font-size:14px;margin:0 0 10px}';
+let ghRefrescar = function () {};
+async function ghAccion(a) {
+  if (a === "gh-on") {
+    const tk = (el("gh-token") ? el("gh-token").value : "").trim();
+    if (!tk) { toast("Pega primero la clave de GitHub"); return; }
+    try { localStorage.setItem(GH.TK, tk); } catch (e) {}
+    toast("Conectando con GitHub…");
+    SYNC.error = null;
+    await initSync();
+    if (SYNC.mode === "cloud") toast("Sincronizado con GitHub ✓");
+    else { try { localStorage.removeItem(GH.TK); } catch (e) {} toast(SYNC.error || "No se pudo conectar"); }
+    ghRefrescar(); return;
+  }
+  if (a === "gh-sync") {
+    toast("Sincronizando…");
+    await GH.vaciar(); await GH.sondear();
+    toast(SYNC.error ? SYNC.error : "Al día ✓"); ghRefrescar(); return;
+  }
+  if (a === "gh-off") {
+    await GH.vaciar();
+    GH.parar();
+    try { localStorage.removeItem(GH.TK); localStorage.removeItem(GH.GK); } catch (e) {}
+    SYNC.mode = "local"; SYNC.doc = null; SYNC.error = null;
+    syncBadge(); toast("Desconectado: los datos siguen en este dispositivo"); ghRefrescar(); return;
+  }
+}
+
 async function initSync() {
   try {
-    if (typeof window.claude === "undefined" || !window.claude || !window.claude.use) return;
-    const db = await window.claude.use("db");
-    if (!db) return;
-    SYNC.doc = db.doc("estado/tracker");
+    let doc = null;
+    if (window.claude && window.claude.use) {
+      const db = await window.claude.use("db");
+      if (db) doc = db.doc("estado/tracker");
+    }
+    if (!doc && GH.token()) doc = await GH.doc();
+    if (!doc) return;
+    SYNC.doc = doc;
     SYNC.mode = "cloud";
     const snap = await SYNC.doc.get();
     let subir = true;
@@ -526,8 +702,12 @@ async function initSync() {
       if (faltan) pushCloud(false);
       if (JSON.stringify(payload()) !== antes) { saveLocal(); repaint(); }
     }, function () { SYNC.mode = "local"; SYNC.doc = null; syncBadge(); });
-    repaint(); syncBadge();
-  } catch (e) {}
+    saveLocal(); repaint(); syncBadge();
+  } catch (e) {
+    SYNC.mode = "local"; SYNC.doc = null; GH.parar();
+    SYNC.error = (e && e.message) || "No se pudo sincronizar";
+    syncBadge();
+  }
 }
 
 /* ---------- aviso flotante ---------- */
@@ -1378,7 +1558,8 @@ function saveComp() {
 
 function openDataModal() {
   document.getElementById("modal-data").innerHTML =
-    '<div class="modal-title"><span>Exportar / Importar datos</span><button class="modal-x" data-act="close-modal">✕</button></div>' +
+    '<div class="modal-title"><span>Tus datos</span><button class="modal-x" data-act="close-modal">✕</button></div>' +
+    ghPanel(false) +
     '<div class="note" style="margin-bottom:14px">Para pasar tus datos entre el móvil y el ordenador: en un dispositivo pulsa <b>Copiar</b> o <b>Guardar .json</b>, y en el otro pega el texto o elige el archivo. Importar reemplaza los datos de este dispositivo.</div>' +
     '<div class="kpi-label" style="margin-bottom:6px">1 · Exportar</div>' +
     '<textarea class="data-io" id="io-out" readonly>' + esc(exportPayload()) + '</textarea>' +
@@ -1528,6 +1709,7 @@ document.addEventListener("click", (e) => {
     return; }
   if (a === "import-data") { importData(); return; }
   if (a === "save-json") { descargarJSON(); return; }
+  if (a.indexOf("gh-") === 0) { ghAccion(a); return; }
 });
 
 /* ---------- navegación lateral ---------- */
@@ -1583,6 +1765,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal
 
 repaint = renderAll;
 accionImportar = importData;
+ghRefrescar = function () { if (document.getElementById("ov-data").classList.contains("open")) openDataModal(); };
 renderAll();
 }
 
@@ -2002,12 +2185,10 @@ function sheetGoal() {
   setTimeout(() => { const e = el("g-val"); if (e) { e.focus(); e.select(); } }, 260);
 }
 function sheetCfg() {
-  const sy = SYNC.mode === "cloud"
-    ? '<div class="sync ok"><i></i> Sincronizado · lo que guardes aquí llega al ordenador</div>'
-    : '<div class="sync local"><i></i> Guardado solo en este dispositivo</div>';
+  const sy = SYNC.mode === "cloud" ? "" : '<div class="sync local"><i></i> Guardado solo en este dispositivo</div>';
   openSheet(
     '<h3>Ajustes</h3><div class="sub">' + S.pays.length + ' cobros · ' + comps().length + ' empresas · v' + VERSION + '</div>' + sy +
-    (SYNC.error ? '<div class="err" style="margin-top:12px">Último aviso de la nube: ' + esc(SYNC.error) + '</div>' : "") +
+    ghPanel(true) +
     '<div class="fg" style="margin-top:20px"><label>Importes</label>' +
       '<div class="seg mode" style="width:100%;display:flex">' +
       '<button style="flex:1" data-act="modo" data-v="neto" class="' + (S.mode === "neto" ? "on" : "") + '">Neto</button>' +
@@ -2079,6 +2260,7 @@ function accion(t) {
       .then(() => toast("Datos copiados")).catch(() => { try { document.execCommand("copy"); toast("Datos copiados"); }
       catch (x) { toast("Selecciona el texto y cópialo"); } }); return; }
   if (a === "save-json") { descargarJSON(); return; }
+  if (a.indexOf("gh-") === 0) { ghAccion(a); return; }
   if (a === "importar") { try {
       const d = JSON.parse(el("io-in").value);
       if (!d || !Array.isArray(d.pays)) throw new Error();
@@ -2121,6 +2303,7 @@ el("ov").addEventListener("click", closeSheet);
 
 repaint = render;
 accionImportar = function () { accion({ dataset: { act: "importar" } }); };
+ghRefrescar = function () { if (el("gh-token") || document.querySelector(".gh-box")) sheetCfg(); };
 render();
 }
 
@@ -2753,7 +2936,7 @@ function arrancar() {
   st.textContent = MOBILE ? CSS_MOB : CSS_DESK;
   document.head.appendChild(st);
   document.body.innerHTML = MOBILE ? HTML_MOB : HTML_DESK;
-  const st2 = document.createElement("style"); st2.textContent = FILE_PICK_CSS; document.head.appendChild(st2);
+  const st2 = document.createElement("style"); st2.textContent = FILE_PICK_CSS + GH_CSS; document.head.appendChild(st2);
   loadLocal();
   if (MOBILE) initMobile(); else initDesktop();
   syncBadge();
