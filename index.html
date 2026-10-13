@@ -19,20 +19,28 @@
 <style>html,body{margin:0;background:#080c12;color:#e8f4fc;font-family:'Syne',ui-sans-serif,system-ui,sans-serif;}</style>
 <script src="vendor/chart.umd.min.js"></script>
 <style>
-#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
-  background:radial-gradient(circle at 50% 55%,rgba(255,215,64,.16) 0%,rgba(255,215,64,0) 42%),#080c12;transition:opacity .45s ease,visibility .45s;}
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  background:radial-gradient(ellipse at 50% 46%,#13203a 0%,#0b1220 38%,#080c12 75%);transition:opacity .5s ease,visibility .5s;}
 #splash.out{opacity:0;visibility:hidden;}
-#splash h1{margin:0;font-family:'Syne',ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:800;font-size:clamp(28px,8vw,44px);
-  letter-spacing:-1px;color:#e8f4fc;opacity:0;animation:spIn .6s .1s ease forwards;}
-#splash h1 span{color:#ffd740;}
-#splash img{width:clamp(110px,32vw,150px);height:auto;border-radius:28%;box-shadow:0 18px 60px rgba(255,215,64,.18);
-  opacity:0;animation:spIn .6s .25s ease forwards,spPulse 1.8s .9s ease-in-out infinite;}
-@keyframes spIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
-@keyframes spPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+#splash h1{margin:0 0 30px;text-align:center;font-family:'Syne',ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-weight:800;font-size:clamp(34px,10vw,52px);line-height:1.05;letter-spacing:-1.2px;color:#e8f4fc;
+  opacity:0;animation:spIn .7s .1s ease forwards;}
+#splash h1 span{display:block;color:#ffd740;}
+#splash .sp-ico{position:relative;opacity:0;animation:spIn .7s .3s ease forwards;}
+#splash .sp-ico::before{content:'';position:absolute;inset:-38%;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,215,64,.20) 0%,rgba(255,215,64,0) 62%);z-index:-1;}
+#splash img{display:block;width:clamp(120px,34vw,160px);height:auto;border-radius:24%;
+  box-shadow:0 22px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,215,64,.12);}
+#splash .sp-bar{position:relative;width:clamp(120px,32vw,150px);height:4px;margin-top:34px;border-radius:4px;
+  background:#1d2d42;overflow:hidden;opacity:0;animation:spIn .7s .5s ease forwards;}
+#splash .sp-bar i{position:absolute;top:0;bottom:0;width:42%;border-radius:4px;
+  background:linear-gradient(90deg,#ffd740,#00e5ff);animation:spBar 1.3s ease-in-out infinite;}
+@keyframes spIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes spBar{0%{left:-42%}100%{left:100%}}
 </style>
 </head>
 <body>
-<div id="splash"><h1>Dividend <span>Tracker</span></h1><img src="icons/logo.svg" alt="Dividend Tracker"></div>
+<div id="splash"><h1>Dividend <span>Tracker</span></h1><div class="sp-ico"><img src="icons/logo.svg" alt="Dividend Tracker"></div><div class="sp-bar"><i></i></div></div>
 
 <script>
 const COMPANY_INFO = {
@@ -3098,11 +3106,11 @@ function arrancar() {
   if (MOBILE) initMobile(); else initDesktop();
   syncBadge();
   initSync();
-  /* pantalla de carga: se ve al menos 1,2 s y luego se desvanece */
+  /* pantalla de carga: se ve al menos 2,6 s y luego se desvanece */
   if (splash) setTimeout(() => {
     splash.classList.add("out");
     setTimeout(() => splash.remove(), 500);
-  }, Math.max(0, 1200 - performance.now()));
+  }, Math.max(0, 2600 - performance.now()));
 }
 /* primero se pinta la pantalla de carga y después se monta la app */
 function arrancarTrasPintar() { requestAnimationFrame(() => setTimeout(arrancar, 0)); }
