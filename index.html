@@ -838,7 +838,7 @@ function renderResumen() {
   const R = 80, CIRC = 2 * Math.PI * R;
   const onTrack = avgMonth >= effGoal;
 
-  const recent = S.pays.slice().sort((a, b) => (b.year - a.year) || (b.month - a.month) || ((b.day || 0) - (a.day || 0))).slice(0, 6);
+  const recent = S.pays.slice().sort((a, b) => (b.year - a.year) || (b.month - a.month) || ((b.day || 0) - (a.day || 0))).slice(0, 8);
 
   const kpi = (label, value, cls) =>
     '<div class="kpi-card"><div class="kpi-head"><div class="kpi-label">' + label + '</div></div>' +
@@ -885,9 +885,10 @@ function renderResumen() {
         '</div></div></div>' +
 
       '<div class="chart-card" style="margin-bottom:0"><div class="chart-title green" style="margin-bottom:6px">Últimos cobros</div>' +
-        recent.map(p => lastPayHTML(p)).join("") + '</div>' +
+        '<div class="recent-list">' + recent.map(p => lastPayHTML(p)).join("") + '</div></div>' +
     '</div>';
 
+  fitDesk();
   chart("ch-mes", {
     type: "bar",
     data: { labels: monthly.map(m => m.label), datasets: [{
@@ -1609,6 +1610,21 @@ function closeModals() {
 /* ══════════════════════════════════════════════════════════════
    RENDER GLOBAL + EVENTOS
    ══════════════════════════════════════════════════════════════ */
+/* ── que todo quepa en la pantalla (resumen y por año) ── */
+function fitDesk() {
+  const h = document.querySelector(".header");
+  if (h) document.documentElement.style.setProperty("--hdr", h.offsetHeight + "px");
+  const box = document.querySelector("#tab-resumen .recent-list");
+  if (!box) return;
+  const rows = Array.prototype.slice.call(box.children);
+  rows.forEach(r => { r.style.display = ""; });
+  if (getComputedStyle(box).overflow !== "hidden") return;      // pantallas estrechas: lista completa
+  for (let i = rows.length - 1; i > 0 && box.scrollHeight > box.clientHeight + 1; i--) rows[i].style.display = "none";
+}
+let _fitT = null;
+window.addEventListener("resize", () => { clearTimeout(_fitT); _fitT = setTimeout(fitDesk, 120); });
+document.addEventListener("fullscreenchange", () => setTimeout(fitDesk, 150));
+
 function renderAll(skipModal) {
   const root = document.documentElement;
   root.style.setProperty("--m", S.mode === "bruto" ? "#ffd740" : "#00e676");
@@ -1626,6 +1642,7 @@ function renderAll(skipModal) {
     c.classList.toggle("active", c.id === "tab-" + U.tab));
   ({ resumen: renderResumen, cobros: renderCobros, empresas: renderEmpresas, peso: renderPeso,
      calendario: renderCalendario, prevision: renderPrevision, anual: renderAnual }[U.tab] || renderResumen)();
+  fitDesk();
 }
 
 function togglear(arr, v) { const i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); }
@@ -1855,13 +1872,13 @@ function renderResumen() {
     '<div class="hero uni">' +
       '<div class="hrow">' +
         '<div class="htop" data-act="modo-alt" title="Cambiar entre neto y bruto">' +
-          '<div class="hero-lab">Dividendos totales · ' + S.mode + ' ⇄</div>' +
+          '<div class="hero-lab">Div. totales · ' + S.mode + ' ⇄</div>' +
           '<div class="hero-val">' + money(total, total >= 1000 ? 0 : 2) + '</div></div>' +
         '<div class="hdyoc"><div class="hero-lab">DYOC total</div>' +
           '<div class="hd-val">' + pct(dyocTotal) + '</div>' +
           '<div class="hd-sub">' + S.mode + ' / invertido</div></div>' +
       '</div>' +
-      '<div class="ctitle">Dividendos por mes' +
+      '<div class="ctitle">Div. mensuales' +
       '<span class="yearnav"><button data-act="year" data-v="-1"' + (yIdx <= 0 ? " disabled style=opacity:.3" : "") + '>‹</button>' +
       '<span>' + cy + '</span>' +
       '<button data-act="year" data-v="1"' + (yIdx >= years.length - 1 ? " disabled style=opacity:.3" : "") + '>›</button></span></div>' +
@@ -1872,16 +1889,16 @@ function renderResumen() {
       '</div></div>' +
 
     '<div class="kgrid" style="margin:16px 0">' +
-      '<div class="kpi"><div class="kpi-lab">Dividendos ' + cy + '</div>' +
+      '<div class="kpi"><div class="kpi-lab">Dividendos<br>' + cy + '</div>' +
         '<div class="kpi-val k-mode">' + money(yearVal, 0) + '</div></div>' +
-      '<div class="kpi"><div class="kpi-lab">Media mensual ' + cy + '</div>' +
+      '<div class="kpi"><div class="kpi-lab">Media mensual<br>' + cy + '</div>' +
         '<div class="kpi-val k-mode">' + money(yearVal / 12) + '</div></div>' +
       '<div class="kpi"><div class="kpi-lab">DYOC ' + cy + '</div>' +
         '<div class="kpi-val k-cyan">' + pct(dyocYear) + '</div></div>' +
       '<div class="kpi"><div class="kpi-lab">Cobros totales</div>' +
         '<div class="kpi-val k-cyan">' + S.pays.length + '</div></div></div>' +
 
-    '<div class="card"><div class="ctitle">Objetivo mensual · ' + S.mode +
+    '<div class="card"><div class="ctitle">Obj. mensual · ' + S.mode +
       '<button class="sp" data-act="goal" style="color:var(--accent)">✎ ' + money(goal, 0) + '</button></div>' +
       '<div class="ring-wrap"><div class="ring">' + ringSVG(gp, 112, 11) +
         '<div class="n">' + Math.round(gp * 100) + '%</div></div>' +
@@ -1890,17 +1907,10 @@ function renderResumen() {
           '<div class="ring-big b2" style="color:var(--gold)">' + money(avgMonth) + '<small> /mes</small></div>' +
         '</div></div></div>' +
 
-    '<div class="card"><div class="ctitle cyan">Corregir datos de una empresa</div>' +
+    '<div class="card"><div class="ctitle cyan">Buscar empresa</div>' +
       '<div class="search" style="margin-bottom:' + (lista.length ? "10px" : "0") + '">🔍' +
         '<input id="empq" placeholder="Escribe el nombre o el ticker…" value="' + esc(empQ) + '"></div>' +
-      (lista.length ? lista.map(c =>
-        '<div class="row" data-act="emp" data-v="' + esc(c.name) + '">' + logo(c.name, 34) +
-        '<div class="row-main"><div class="row-name">' + esc(c.name) + '</div>' +
-        '<div class="row-meta">' + (c.shares != null ? (+c.shares.toFixed(4)) + " acc" : "sin acciones") +
-          (c.price != null ? " · " + money(c.price) + "/acc" : "") +
-          (c.quote != null ? " · cotiza " + money(c.quote) : " · sin cotización") +
-          (c.yield != null ? ' · <span style="color:var(--accent)">DYOC ' + pct(c.yield) + '</span>' : "") + '</div></div>' +
-        '<div class="row-val" style="color:var(--muted);font-size:17px">›</div></div>').join("")
+      (lista.length ? lista.map(c => mEmpCard(c)).join("")
         : (q ? '<div class="empty" style="padding:20px 8px">Sin resultados para "' + esc(empQ) + '".</div>' : "")) +
     '</div>' +
 
@@ -1914,6 +1924,41 @@ function renderResumen() {
     empQ = e.target.value; render();
     const n = el("empq"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   });
+}
+/* tarjeta de empresa en la búsqueda (como en el dashboard) */
+let mHist = null;
+function mEmpCard(c) {
+  const na = c.sold || c.current == null || c.value == null;
+  const gain = na ? 0 : c.current - c.value;
+  const gainTxt = U.empGainMode === "eur"
+    ? (na ? "—" : sgn(gain) + money(gain))
+    : ((na || c.value <= 0) ? "—" : sgn(gain / c.value) + pct(gain / c.value));
+  const n = esc(c.name), abierto = mHist === c.name;
+  return '<div class="mcard' + (c.sold ? " sold" : "") + '">' +
+    '<div class="mc-top">' + logo(c.name, 34) +
+      '<div class="mc-name"><b>' + n + '</b><span>' + esc(c.ticker || "") + (c.sold ? (c.ticker ? " · " : "") + "vendida" : "") + '</span></div>' +
+      (!c.sold && c.yield != null ? '<span class="mc-pill">' + pct(c.yield) + '</span>' : "") +
+      '<button class="mc-edit" data-act="emp" data-v="' + n + '" aria-label="Editar">✎</button></div>' +
+    '<div class="mc-mid">' +
+      '<div><div class="mc-lab">Dividendos cobrados</div><div class="mc-big" style="color:var(--m)">' +
+        money(S.mode === "bruto" ? c.grossTotal : c.netTotal) + '</div></div>' +
+      '<div style="text-align:right"><button class="mc-lab mc-sw" data-act="mgain">Gan / Pérd <i>' + (U.empGainMode === "eur" ? "€" : "%") + ' ⇄</i></button>' +
+        '<div class="mc-big" style="color:' + (na ? "var(--muted)" : gain >= 0 ? "var(--green)" : "#ff5b6e") + '">' + gainTxt + '</div></div></div>' +
+    '<div class="mc-rows mc-first"><span>' + (c.shares != null ? (+c.shares.toFixed(4)) + " acc" : "— acc") + '</span>' +
+      '<span>invertido ' + (c.sold || c.value == null ? "—" : money(c.value)) + '</span></div>' +
+    '<div class="mc-rows"><span>' + (c.price != null ? money(c.price) + "/acc" : "—/acc") + '</span>' +
+      '<span>' + c.count + ' cobro' + (c.count !== 1 ? "s" : "") + '</span></div>' +
+    '<div class="cats mc-cats">' +
+      '<button data-act="mcat" data-v="' + n + '|growth" class="' + (c.cat === "growth" ? "g" : "") + '">Growth</button>' +
+      '<button data-act="mcat" data-v="' + n + '|dividenderas" class="' + (c.cat === "dividenderas" ? "d" : "") + '">Dividendera</button>' +
+      '<button data-act="mcat" data-v="' + n + '|cagadas" class="' + (c.cat === "cagadas" ? "c" : "") + '">Cagada</button></div>' +
+    '<button class="mc-sold" data-act="msold" data-v="' + n + '">' + (c.sold ? "↺ Volver a cartera" : "🗄 Marcar vendida") + '</button>' +
+    '<button class="mc-link" data-act="mhist" data-v="' + n + '">' + (abierto ? "Ocultar cobros ▲" : "Ver todos los cobros ▼") + '</button>' +
+    (abierto ? '<div class="mc-hist">' + S.pays.filter(p => p.name === c.name)
+      .sort((a, b) => (b.year - a.year) || (b.month - a.month) || ((b.day || 0) - (a.day || 0)))
+      .map(p => '<div><span>' + (p.day != null ? p.day + " " : "") + MESES[p.month] + " " + p.year + '</span>' +
+        '<b>' + money(amtOf(p)) + '</b></div>').join("") + '</div>' : "") +
+  '</div>';
 }
 /* pasar el dedo por las columnas para ver el importe del mes */
 function wireBars(mv) {
@@ -2118,24 +2163,32 @@ function sheetEmp(name) {
   if (!c) return;
   const inv = (c.shares != null && c.price != null) ? c.shares * c.price : null;
   const mkt = (c.shares != null && c.quote != null) ? c.shares * c.quote : null;
-  const dyoc = (inv && inv > 0) ? c.annualGross / inv : null;      // sobre tu precio medio
-  const dya = (mkt && mkt > 0) ? c.annualGross / mkt : null;       // sobre la cotización actual
+  const mercado = U.yieldBasis === "mercado";
+  const yv = (i, m) => {                                   // DYOC: sobre tu precio medio · DYA: sobre la cotización
+    const base = mercado ? m : i;
+    return (base && base > 0) ? c.annualGross / base : null;
+  };
+  const gpTxt = (i, m) => (i && m != null && i > 0)
+    ? '<span style="color:' + (m >= i ? "var(--green)" : "#ff5b6e") + '">' + sgn((m - i) / i) + pct((m - i) / i) + '</span>' +
+      '<small>' + sgn(m - i) + money(m - i) + '</small>'
+    : "—";
   openSheet(
-    '<h3>' + logo(name, 32) + esc(name) + '</h3>' +
+    '<h3>' + logo(name, 32) + '<span style="flex:1;min-width:0">' + esc(name) + '</span>' +
+      '<button class="yswap" data-act="myield" aria-label="Cambiar entre DYOC y DYA">⇄</button></h3>' +
     '<div class="sub">' + c.count + ' cobros' + (c.sold ? " · vendida" : "") + '</div>' +
     '<div class="kgrid c3" style="margin-bottom:16px">' +
-      '<div class="kpi"><div class="kpi-lab">Cobrado</div><div class="kpi-val k-mode" style="font-size:16px">' +
+      '<div class="kpi"><div class="kpi-lab">Dividendos</div><div class="kpi-val k-mode" style="font-size:16px">' +
         money(S.mode === "bruto" ? c.grossTotal : c.netTotal) + '</div></div>' +
-      '<div class="kpi"><div class="kpi-lab">DYOC</div><div class="kpi-val k-cyan" style="font-size:16px">' +
-        pct(dyoc) + '</div></div>' +
-      '<div class="kpi"><div class="kpi-lab">DYA</div><div class="kpi-val k-cyan" style="font-size:16px">' +
-        pct(dya) + '</div></div></div>' +
+      '<div class="kpi"><div class="kpi-lab">G/P</div><div class="kpi-val kgp" id="c-gp" style="font-size:16px">' +
+        gpTxt(inv, mkt) + '</div></div>' +
+      '<div class="kpi"><div class="kpi-lab" id="c-ylab">' + (mercado ? "DYA" : "DYOC") + '</div>' +
+        '<div class="kpi-val k-cyan" id="c-yval" style="font-size:16px">' + pct(yv(inv, mkt)) + '</div></div></div>' +
     '<div class="frow c2">' +
       '<div class="fg"><label>Acciones</label><input id="c-shares" type="text" inputmode="decimal" value="' +
         (c.shares != null ? c.shares : "") + '"></div>' +
       '<div class="fg"><label>Precio medio</label><input id="c-price" type="text" inputmode="decimal" value="' +
         (c.price != null ? c.price : "") + '"></div></div>' +
-    '<div class="frow c2">' +
+    '<div class="frow c2" style="align-items:end">' +
       '<div class="fg"><label>Cotización actual</label><input id="c-quote" type="text" inputmode="decimal" value="' +
         (c.quote != null ? c.quote : "") + '"></div>' +
       '<div class="fg"><label>Ticker</label><input id="c-ticker" value="' + esc(c.ticker || "") + '"></div></div>' +
@@ -2151,12 +2204,24 @@ function sheetEmp(name) {
     '<button class="btn gho" data-act="sold" data-v="' + esc(name) + '">' +
       (c.sold ? "Volver a cartera" : "Marcar como vendida") + '</button>' +
     '<button class="btn gho" data-act="cerrar">Cerrar</button>');
-  const rec = () => {
+  const leer = () => {
     const sh = vn("c-shares") === "" ? null : num(vn("c-shares"));
     const pr = vn("c-price") === "" ? null : num(vn("c-price"));
     const qt = vn("c-quote") === "" ? null : num(vn("c-quote"));
-    const i = (sh != null && pr != null) ? sh * pr : null;
-    const m = (sh != null && qt != null) ? sh * qt : null;
+    return { i: (sh != null && pr != null) ? sh * pr : null, m: (sh != null && qt != null) ? sh * qt : null };
+  };
+  /* el botón ⇄ cambia entre DYOC y DYA sin perder lo que estés escribiendo */
+  sheetEmp.swap = () => {
+    U.yieldBasis = U.yieldBasis === "mercado" ? "coste" : "mercado";
+    saveLocal();
+    const x = leer(), base = U.yieldBasis === "mercado" ? x.m : x.i;
+    el("c-ylab").textContent = U.yieldBasis === "mercado" ? "DYA" : "DYOC";
+    el("c-yval").textContent = pct((base && base > 0) ? c.annualGross / base : null);
+  };
+  const rec = () => {
+    const x = leer(), i = x.i, m = x.m, base = U.yieldBasis === "mercado" ? m : i;
+    el("c-gp").innerHTML = gpTxt(i, m);
+    el("c-yval").textContent = pct((base && base > 0) ? c.annualGross / base : null);
     el("c-inv").textContent = i != null ? money(i) : "—";
     const me = el("c-mkt");
     me.textContent = m != null ? money(m) : "—";
@@ -2211,6 +2276,15 @@ function accion(t) {
   if (a === "nuevo") { sheetPay(null); return; }
   if (a === "edit") { sheetPay(S.pays.filter(p => p.id === t.dataset.id)[0]); return; }
   if (a === "emp") { sheetEmp(val); return; }
+  if (a === "myield") { if (sheetEmp.swap) sheetEmp.swap(); return; }
+  if (a === "mgain") { U.empGainMode = U.empGainMode === "pct" ? "eur" : "pct"; saveLocal(); render(); return; }
+  if (a === "mhist") { mHist = mHist === val ? null : val; render(); return; }
+  if (a === "msold") { S.sold = S.sold.indexOf(val) >= 0 ? S.sold.filter(x => x !== val) : S.sold.concat([val]);
+    save(); toast(S.sold.indexOf(val) >= 0 ? "Marcada como vendida" : "De vuelta en cartera"); render(); return; }
+  if (a === "mcat") { const q = val.split("|"), n = q[0], k = q[1];
+    const c = Object.assign({}, S.cats);
+    if (c[n] === k) delete c[n]; else c[n] = k;
+    S.cats = c; save(); render(); return; }
   if (a === "vista") { U.view = val; empQ = ""; window.scrollTo(0, 0); render(); return; }
   if (a === "mes") {
     const k = Number(val), i = U.openM.indexOf(k);
@@ -2596,6 +2670,42 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
 .sync.ok i{background:var(--green);box-shadow:0 0 8px var(--green);}
 .sync.ok{color:var(--green);}
 .sync.local i{background:var(--gold);}
+
+/* ── todo de un vistazo: Resumen y Por año ocupan justo la pantalla ── */
+@media (min-width:1100px) and (min-height:540px){
+  .header{padding-top:12px;padding-bottom:12px;}
+  #tab-resumen.active,#tab-anual.active{display:flex;flex-direction:column;height:calc(100vh - var(--hdr,70px));
+    padding-top:14px;padding-bottom:14px;overflow:hidden;}
+  #tab-resumen .hero-grid{margin-bottom:12px;flex:0 0 auto;gap:10px;}
+  #tab-resumen .kpi-hero{padding:14px 20px;display:flex;flex-direction:column;justify-content:center;}
+  #tab-resumen .kpi-hero .kpi-label{margin-bottom:8px;}
+  #tab-resumen .kpi-hero .kpi-value{font-size:clamp(32px,5.4vh,48px);}
+  #tab-resumen .kpi-hero .kpi-sub{margin-top:6px;}
+  #tab-resumen .hero-rest{gap:8px;}
+  #tab-resumen .hero-rest .kpi-card{padding:clamp(7px,1.3vh,14px) 12px;display:flex;flex-direction:column;justify-content:center;}
+  #tab-resumen .hero-rest .kpi-value{font-size:clamp(17px,2.9vh,24px);}
+  #tab-resumen .kpi-head{margin-bottom:clamp(3px,.8vh,10px);}
+  #tab-resumen > .chart-card{flex:1 1 0;min-height:150px;display:flex;flex-direction:column;margin-bottom:12px;padding:12px 18px;}
+  #tab-resumen > .chart-card .chart-head{margin-bottom:6px;}
+  #tab-resumen > .chart-card .chart-box{flex:1 1 auto;height:auto;min-height:0;}
+  #tab-resumen .section-grid{flex:0 0 clamp(185px,31vh,320px);margin-bottom:0;gap:12px;min-height:0;}
+  #tab-resumen .section-grid > .chart-card{padding:12px 18px;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
+  #tab-resumen .section-grid .chart-head{margin-bottom:4px;}
+  #tab-resumen .goal-wrap{flex:1 1 auto;padding:0;gap:clamp(14px,2.5vw,30px);flex-wrap:nowrap;min-height:0;}
+  #tab-resumen .ring,#tab-resumen .ring svg{width:clamp(110px,22vh,190px);height:clamp(110px,22vh,190px);}
+  #tab-resumen .ring .num{font-size:clamp(22px,3.6vh,34px);}
+  #tab-resumen .goal-figs.col{gap:clamp(6px,1.4vh,20px);}
+  #tab-resumen .goal-big{font-size:clamp(24px,4.2vh,38px);}
+  #tab-resumen .recent-list{flex:1 1 auto;min-height:0;overflow:hidden;}
+  #tab-resumen .lastpay-head{padding:clamp(5px,.9vh,10px) 2px;}
+  #tab-anual.active{overflow-y:auto;}
+  #tab-anual > .chart-card{flex:1 1 0;min-height:220px;display:flex;flex-direction:column;margin-bottom:12px;padding:14px 20px;}
+  #tab-anual > .chart-card .chart-head{margin-bottom:8px;}
+  #tab-anual > .chart-card > div[style*="margin:2px 0 18px"]{margin:0 0 8px !important;}
+  #tab-anual > .chart-card .chart-box{flex:1 1 auto;height:auto;min-height:0;}
+  #tab-anual > .emp-grid{flex:0 0 auto;}
+  #tab-anual .emp-card{padding-top:12px;padding-bottom:10px;}
+}
 `;
 const CSS_MOB  = `@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
@@ -2860,6 +2970,35 @@ textarea.io{width:100%;height:110px;background:var(--surface2);border:1px solid 
 
 .lg-img{border-radius:9px;object-fit:contain;background:#fff;flex-shrink:0;}
 .lg-ini{border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;}
+
+.mcard{background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:14px;margin-top:10px;}
+.mcard.sold{opacity:.6;}
+.mc-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.mc-name{flex:1;min-width:0;display:flex;flex-direction:column;}
+.mc-name b{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mcard.sold .mc-name b{text-decoration:line-through;}
+.mc-name span{font-family:'JetBrains Mono';font-size:11px;color:var(--muted);}
+.mc-pill{font-family:'JetBrains Mono';font-size:11px;font-weight:700;color:var(--accent);border:1px solid rgba(0,229,255,.45);
+  background:rgba(0,229,255,.1);border-radius:999px;padding:3px 9px;flex-shrink:0;}
+.mc-edit{width:36px;height:32px;border-radius:10px;border:1px solid var(--border);background:var(--surface3);color:var(--text);font-size:14px;flex-shrink:0;}
+.mc-mid{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-bottom:12px;}
+.mc-lab{font-size:9px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin-bottom:5px;}
+.mc-sw{background:none;border:none;font-family:inherit;display:inline-flex;align-items:center;gap:5px;padding:0;}
+.mc-sw i{font-style:normal;font-family:'JetBrains Mono';letter-spacing:0;border:1px solid var(--border);border-radius:999px;padding:0 5px;}
+.mc-big{font-family:'JetBrains Mono';font-size:19px;font-weight:700;letter-spacing:-.4px;}
+.mc-rows{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:11.5px;color:var(--muted);padding-top:6px;}
+.mc-rows.mc-first{border-top:1px solid var(--border);padding-top:10px;}
+.mc-cats{margin:12px 0 8px;} .mc-cats button{padding:9px 4px;font-size:10.5px;}
+.mc-sold{width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface3);color:var(--text);
+  font-family:inherit;font-weight:700;font-size:12.5px;}
+.mc-link{display:block;width:100%;background:none;border:none;color:var(--accent);font-family:inherit;font-weight:700;font-size:12px;padding:10px 0 2px;}
+.mc-hist{margin-top:6px;border-top:1px solid var(--border);padding-top:6px;}
+.mc-hist div{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:12px;padding:5px 2px;}
+.mc-hist span{color:var(--muted);} .mc-hist b{color:var(--m);}
+.yswap{width:38px;height:34px;border-radius:999px;border:1px solid rgba(0,229,255,.45);background:rgba(0,229,255,.1);
+  color:var(--accent);font-size:17px;font-weight:700;flex-shrink:0;}
+.kgp{display:flex;flex-direction:column;align-items:center;line-height:1.1;}
+.kgp small{font-size:10.5px;font-weight:600;color:var(--muted);margin-top:3px;}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
