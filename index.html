@@ -1940,9 +1940,9 @@ function mEmpCard(c) {
       (!c.sold && c.yield != null ? '<span class="mc-pill">' + pct(c.yield) + '</span>' : "") +
       '<button class="mc-edit" data-act="emp" data-v="' + n + '" aria-label="Editar">✎</button></div>' +
     '<div class="mc-mid">' +
-      '<div><div class="mc-lab">Dividendos cobrados</div><div class="mc-big" style="color:var(--m)">' +
+      '<div><div class="mc-lab">Div. cobrados</div><div class="mc-big" style="color:var(--m)">' +
         money(S.mode === "bruto" ? c.grossTotal : c.netTotal) + '</div></div>' +
-      '<div style="text-align:right"><button class="mc-lab mc-sw" data-act="mgain">Gan / Pérd <i>' + (U.empGainMode === "eur" ? "€" : "%") + ' ⇄</i></button>' +
+      '<div style="text-align:right"><button class="mc-lab mc-sw" data-act="mgain">G/P <i>' + (U.empGainMode === "eur" ? "€" : "%") + ' ⇄</i></button>' +
         '<div class="mc-big" style="color:' + (na ? "var(--muted)" : gain >= 0 ? "var(--green)" : "#ff5b6e") + '">' + gainTxt + '</div></div></div>' +
     '<div class="mc-rows mc-first"><span>' + (c.shares != null ? (+c.shares.toFixed(4)) + " acc" : "— acc") + '</span>' +
       '<span>invertido ' + (c.sold || c.value == null ? "—" : money(c.value)) + '</span></div>' +
@@ -2169,12 +2169,12 @@ function sheetEmp(name) {
     return (base && base > 0) ? c.annualGross / base : null;
   };
   const gpTxt = (i, m) => (i && m != null && i > 0)
-    ? '<span style="color:' + (m >= i ? "var(--green)" : "#ff5b6e") + '">' + sgn((m - i) / i) + pct((m - i) / i) + '</span>' +
-      '<small>' + sgn(m - i) + money(m - i) + '</small>'
+    ? '<span style="color:' + (m >= i ? "var(--green)" : "#ff5b6e") + '">' +
+      (U.yieldBasis === "mercado" ? sgn(m - i) + money(m - i) : sgn((m - i) / i) + pct((m - i) / i)) + '</span>'
     : "—";
   openSheet(
     '<h3>' + logo(name, 32) + '<span style="flex:1;min-width:0">' + esc(name) + '</span>' +
-      '<button class="yswap" data-act="myield" aria-label="Cambiar entre DYOC y DYA">⇄</button></h3>' +
+      '<button class="yswap" data-act="myield" aria-label="Cambiar DYOC/DYA y G/P en % o en €">⇄</button></h3>' +
     '<div class="sub">' + c.count + ' cobros' + (c.sold ? " · vendida" : "") + '</div>' +
     '<div class="kgrid c3" style="margin-bottom:16px">' +
       '<div class="kpi"><div class="kpi-lab">Dividendos</div><div class="kpi-val k-mode" style="font-size:16px">' +
@@ -2217,6 +2217,7 @@ function sheetEmp(name) {
     const x = leer(), base = U.yieldBasis === "mercado" ? x.m : x.i;
     el("c-ylab").textContent = U.yieldBasis === "mercado" ? "DYA" : "DYOC";
     el("c-yval").textContent = pct((base && base > 0) ? c.annualGross / base : null);
+    el("c-gp").innerHTML = gpTxt(x.i, x.m);
   };
   const rec = () => {
     const x = leer(), i = x.i, m = x.m, base = U.yieldBasis === "mercado" ? m : i;
@@ -2988,7 +2989,8 @@ textarea.io{width:100%;height:110px;background:var(--surface2);border:1px solid 
 .mc-big{font-family:'JetBrains Mono';font-size:19px;font-weight:700;letter-spacing:-.4px;}
 .mc-rows{display:flex;justify-content:space-between;font-family:'JetBrains Mono';font-size:11.5px;color:var(--muted);padding-top:6px;}
 .mc-rows.mc-first{border-top:1px solid var(--border);padding-top:10px;}
-.mc-cats{margin:12px 0 8px;} .mc-cats button{padding:9px 4px;font-size:10.5px;}
+.mc-cats{margin:12px 0 8px;gap:6px;} .mc-cats button{min-width:0;padding:9px 2px;font-size:9.5px;letter-spacing:.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mcard{overflow:hidden;}
 .mc-sold{width:100%;padding:10px;border-radius:12px;border:1px solid var(--border);background:var(--surface3);color:var(--text);
   font-family:inherit;font-weight:700;font-size:12.5px;}
 .mc-link{display:block;width:100%;background:none;border:none;color:var(--accent);font-family:inherit;font-weight:700;font-size:12px;padding:10px 0 2px;}
@@ -3077,6 +3079,7 @@ function arrancar() {
   document.body.innerHTML = MOBILE ? HTML_MOB : HTML_DESK;
   const st2 = document.createElement("style"); st2.textContent = FILE_PICK_CSS + GH_CSS; document.head.appendChild(st2);
   loadLocal();
+  U.tab = "resumen"; U.view = "inicio";          // al abrir, siempre en Resumen
   if (MOBILE) initMobile(); else initDesktop();
   syncBadge();
   initSync();
