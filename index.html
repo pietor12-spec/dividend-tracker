@@ -18,8 +18,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>html,body{margin:0;background:#080c12;color:#e8f4fc;font-family:'Syne',ui-sans-serif,system-ui,sans-serif;}</style>
 <script src="vendor/chart.umd.min.js"></script>
+<style>
+#splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;
+  background:radial-gradient(circle at 50% 55%,rgba(255,215,64,.16) 0%,rgba(255,215,64,0) 42%),#080c12;transition:opacity .45s ease,visibility .45s;}
+#splash.out{opacity:0;visibility:hidden;}
+#splash h1{margin:0;font-family:'Syne',ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-weight:800;font-size:clamp(28px,8vw,44px);
+  letter-spacing:-1px;color:#e8f4fc;opacity:0;animation:spIn .6s .1s ease forwards;}
+#splash h1 span{color:#ffd740;}
+#splash img{width:clamp(110px,32vw,150px);height:auto;border-radius:28%;box-shadow:0 18px 60px rgba(255,215,64,.18);
+  opacity:0;animation:spIn .6s .25s ease forwards,spPulse 1.8s .9s ease-in-out infinite;}
+@keyframes spIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes spPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
+</style>
 </head>
 <body>
+<div id="splash"><h1>Dividend <span>Tracker</span></h1><img src="icons/logo.svg" alt="Dividend Tracker"></div>
 
 <script>
 const COMPANY_INFO = {
@@ -3076,16 +3089,25 @@ function arrancar() {
   const st = document.createElement("style");
   st.textContent = MOBILE ? CSS_MOB : CSS_DESK;
   document.head.appendChild(st);
+  const splash = document.getElementById("splash");
   document.body.innerHTML = MOBILE ? HTML_MOB : HTML_DESK;
+  if (splash) document.body.appendChild(splash);
   const st2 = document.createElement("style"); st2.textContent = FILE_PICK_CSS + GH_CSS; document.head.appendChild(st2);
   loadLocal();
   U.tab = "resumen"; U.view = "inicio";          // al abrir, siempre en Resumen
   if (MOBILE) initMobile(); else initDesktop();
   syncBadge();
   initSync();
+  /* pantalla de carga: se ve al menos 1,2 s y luego se desvanece */
+  if (splash) setTimeout(() => {
+    splash.classList.add("out");
+    setTimeout(() => splash.remove(), 500);
+  }, Math.max(0, 1200 - performance.now()));
 }
-if (document.body) arrancar();
-else document.addEventListener("DOMContentLoaded", arrancar);
+/* primero se pinta la pantalla de carga y después se monta la app */
+function arrancarTrasPintar() { requestAnimationFrame(() => setTimeout(arrancar, 0)); }
+if (document.body) arrancarTrasPintar();
+else document.addEventListener("DOMContentLoaded", arrancarTrasPintar);
 
 </script>
 
