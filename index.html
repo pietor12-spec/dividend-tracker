@@ -3126,7 +3126,14 @@ function arrancar() {
   }, Math.max(0, 2600 - performance.now()));
 }
 /* primero se pinta la pantalla de carga y después se monta la app */
-function arrancarTrasPintar() { requestAnimationFrame(() => setTimeout(arrancar, 0)); }
+let _arrancado = false;
+function arrancarUnaVez() { if (_arrancado) return; _arrancado = true; arrancar(); }
+function arrancarTrasPintar() {
+  /* si el navegador no pinta enseguida (pestaña en segundo plano, vista incrustada),
+     arrancamos igualmente a los 80 ms para no quedarnos en la pantalla de carga */
+  try { requestAnimationFrame(() => setTimeout(arrancarUnaVez, 0)); } catch (e) {}
+  setTimeout(arrancarUnaVez, 80);
+}
 if (document.body) arrancarTrasPintar();
 else document.addEventListener("DOMContentLoaded", arrancarTrasPintar);
 
