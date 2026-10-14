@@ -1917,11 +1917,11 @@ function renderResumen() {
       '<button data-act="year" data-v="1"' + (yIdx >= years.length - 1 ? " disabled style=opacity:.3" : "") + '>›</button></span></div>' +
       '<div class="bars">' + mv.map((val, i) =>
         '<div class="bar' + (val <= 0 ? " cero" : (i === MONTH_NOW && cy === YEAR_NOW ? " now" : "")) + '">' +
-        '<span class="bt"><i style="height:' + (val > 0 ? Math.max(5, Math.round((val / maxM) * 115)) : 3) + 'px"></i></span>' +
+        '<span class="bt"><i style="height:' + (val > 0 ? Math.max(4, (val / maxM) * 100).toFixed(1) : 2) + '%"></i></span>' +
         '<b>' + MESES[i][0] + '</b></div>').join("") +
       '</div></div>' +
 
-    '<div class="kgrid" style="margin:16px 0">' +
+    '<div class="kgrid fold-k">' +
       '<div class="kpi"><div class="kpi-lab">Dividendos<br>' + cy + '</div>' +
         '<div class="kpi-val k-mode">' + money(yearVal, 0) + '</div></div>' +
       '<div class="kpi"><div class="kpi-lab">Media mensual<br>' + cy + '</div>' +
@@ -3107,45 +3107,56 @@ textarea.io{width:100%;height:110px;background:var(--surface2);border:1px solid 
 .pz-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;}
 .pz-bar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);opacity:.55;border-radius:2px;}
 
-/* ══ letra algo más grande y cabecera más alta (móvil) ══ */
-.appbar{padding:calc(var(--sat) + 12px) 14px 12px;gap:12px;}
-.ab-logo{width:46px;height:46px;border-radius:13px;}
-.ab-tit b{font-size:21px;letter-spacing:-.4px;}
-.ab-btn{width:44px;height:44px;border-radius:13px;font-size:18px;}
-.ab-btn.add{font-size:25px;}
-.vtabs{top:calc(var(--sat) + 70px);}
-main{padding-top:calc(var(--sat) + 136px);}
-.vtabs button{font-size:11.5px;padding:9px 0;}
-.fold{min-height:calc(100vh - var(--sat) - 128px);min-height:calc(100dvh - var(--sat) - 128px);}
-.ctitle{font-size:11.5px;}
-.ctitle .sp{font-size:12px;}
-.hero .hrow .hero-lab{font-size:10px;}
-.hero-val{font-size:44px;}
-.hero .hd-val{font-size:28px;}
-.hero .hd-sub{font-size:10.5px;}
-.kpi-lab{font-size:10px;}
-.kpi-val{font-size:21px;}
-.bar b{font-size:9.5px;}
-.yearnav span{font-size:14px;}
-.ring .n{font-size:27px;}
-.ring-big{font-size:26px;}
-.ring-big small{font-size:12px;}
-.row-name{font-size:14.5px;}
-.row-meta{font-size:11.5px;}
-.row-val{font-size:15px;}
-.row-val small{font-size:11px;}
-.mhead .mn,.mhead .mv{font-size:14.5px;}
-.mhead .mc{font-size:11px;}
-.ybar b{font-size:20px;} .ybar span{font-size:12px;} .ybar em{font-size:16px;}
+/* ══ móvil: letra un poco mayor, cabecera algo más alta y la primera pantalla (hasta el objetivo) siempre cabe ══ */
+.appbar{padding:calc(var(--sat) + 11px) 14px 11px;gap:12px;}
+.ab-logo{width:42px;height:42px;border-radius:12px;}
+.ab-tit b{font-size:19px;letter-spacing:-.4px;}
+.ab-btn{width:40px;height:40px;border-radius:12px;font-size:17px;}
+.ab-btn.add{font-size:23px;}
+.vtabs{top:calc(var(--sat) + 64px);}
+main{padding-top:calc(var(--sat) + 128px);}
+.vtabs button{font-size:11px;padding:8px 0;}
+.fold{display:flex;flex-direction:column;height:calc(100vh - var(--sat) - 128px - 10px);height:calc(100dvh - var(--sat) - 128px - 10px);min-height:520px;}
+.fold > .hero.uni{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;margin-bottom:10px;padding:16px 16px 14px;}
+.fold .hero .ctitle{margin-top:14px;margin-bottom:10px;}
+.fold .bars{flex:1 1 auto;height:auto;min-height:56px;max-height:170px;}
+.fold .bar .bt{flex:1 1 auto;height:auto;min-height:0;}
+.fold .fold-k{margin:0 0 10px;gap:9px;}
+.fold .fold-k .kpi{padding:10px 8px;}
+.fold > .card:last-child{margin-bottom:0;padding:13px 14px;}
+.fold .ring{width:clamp(80px,13vh,108px);height:clamp(80px,13vh,108px);}
+.fold .ring svg{width:100%;height:100%;}
+.fold + .card{margin-top:12px;}
+.ctitle{font-size:11px;}
+.ctitle .sp{font-size:11.5px;}
+.hero .hrow .hero-lab{font-size:9.5px;}
+.hero-val{font-size:40px;}
+.hero .hd-val{font-size:26px;}
+.hero .hd-sub{font-size:10px;}
+.kpi-lab{font-size:9.5px;}
+.kpi-val{font-size:20px;margin-top:6px;}
+.bar b{font-size:9px;}
+.yearnav span{font-size:13.5px;}
+.ring .n{font-size:24px;}
+.ring-big{font-size:24px;}
+.ring-big small{font-size:11.5px;}
+.ring-figs .b2{margin-top:6px;}
+.row-name{font-size:14px;}
+.row-meta{font-size:11px;}
+.row-val{font-size:14.5px;}
+.row-val small{font-size:10.5px;}
+.mhead .mn,.mhead .mv{font-size:14px;}
+.mhead .mc{font-size:10.5px;}
+.ybar b{font-size:20px;} .ybar span{font-size:11.5px;} .ybar em{font-size:15.5px;}
 .search input{font-size:16px;}
-.mc-name b{font-size:16px;} .mc-name span{font-size:12px;}
-.mc-lab{font-size:10px;} .mc-big{font-size:20px;} .mc-rows{font-size:12.5px;}
-.mc-link{font-size:13px;} .mc-sold{font-size:13.5px;}
-.sheet h3{font-size:18px;} .sheet .sub{font-size:12.5px;}
-.fg label{font-size:10.5px;}
-.pz-total{font-size:42px;margin-top:14px;}
-.pz-n{font-size:14px;} .pz-s{font-size:12px;} .pz-over b,.pz-top b{font-size:14.5px;}
-.pz-note{font-size:12.5px;}
+.mc-name b{font-size:15.5px;} .mc-name span{font-size:11.5px;}
+.mc-lab{font-size:9.5px;} .mc-big{font-size:19.5px;} .mc-rows{font-size:12px;}
+.mc-link{font-size:12.5px;} .mc-sold{font-size:13px;}
+.sheet h3{font-size:17px;} .sheet .sub{font-size:12px;}
+.fg label{font-size:10px;}
+.pz-total{font-size:40px;margin-top:12px;}
+.pz-n{font-size:13.5px;} .pz-s{font-size:11.5px;} .pz-over b,.pz-top b{font-size:14px;}
+.pz-note{font-size:12px;}
 /* Peso: selector y etiquetas más pequeños */
 .pz-hero .seg{padding:2px;border-radius:8px;}
 .pz-hero .seg button{padding:4px 8px;font-size:9.5px;letter-spacing:.3px;border-radius:6px;}
