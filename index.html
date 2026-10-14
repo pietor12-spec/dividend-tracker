@@ -17,16 +17,13 @@
 <style>html,body{margin:0;background:#080c12;color:#e8f4fc;font-family:'Syne',ui-sans-serif,system-ui,sans-serif;}</style>
 <script src="vendor/chart.umd.min.js"></script>
 <style>
-/* tipografía incluida en la app (funciona sin conexión): Inter para todo, Syne solo para la marca */
+/* tipografía incluida en la app (funciona sin conexión): Inter para todo */
 @font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url(vendor/fonts/inter-latin-400-normal.woff2) format('woff2')}
 @font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url(vendor/fonts/inter-latin-500-normal.woff2) format('woff2')}
 @font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url(vendor/fonts/inter-latin-600-normal.woff2) format('woff2')}
 @font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url(vendor/fonts/inter-latin-700-normal.woff2) format('woff2')}
 @font-face{font-family:'Inter';font-weight:800;font-display:swap;src:url(vendor/fonts/inter-latin-800-normal.woff2) format('woff2')}
-@font-face{font-family:'Syne';font-weight:700;font-display:swap;src:url(vendor/fonts/syne-latin-700-normal.woff2) format('woff2')}
-@font-face{font-family:'Syne';font-weight:800;font-display:swap;src:url(vendor/fonts/syne-latin-800-normal.woff2) format('woff2')}
 *{font-family:'Inter',system-ui,-apple-system,"Segoe UI",sans-serif !important;font-variant-numeric:tabular-nums;}
-.header h1,.header h1 *,.ab-tit,.ab-tit *,#splash h1,#splash h1 *{font-family:'Syne',ui-sans-serif,system-ui,sans-serif !important;}
 .kpi-label,.kpi-lab,.hero-lab,.ctitle,.chart-title,.mc-lab{letter-spacing:.9px !important;font-weight:700 !important;}
 .kpi-value,.kpi-val,.hero-val,.hd-val,.goal-big,.ring-big,.mc-big,.mono{letter-spacing:-.3px !important;font-weight:700 !important;}
 </style>
@@ -1828,9 +1825,10 @@ function render() {
   document.documentElement.style.setProperty("--m-rgb", S.mode === "bruto" ? "255,215,64" : "0,230,118");
   const tabs = document.querySelectorAll("#vtabs button");
   Array.prototype.forEach.call(tabs, (b) => {
-    b.classList.toggle("on", b.dataset.v === (U.view === "cobros" ? "cobros" : "resumen"));
+    b.classList.toggle("on", b.dataset.v === (U.view === "cobros" || U.view === "peso" ? U.view : "resumen"));
   });
   if (U.view === "cobros") { renderCobros(); return; }
+  if (U.view === "peso") { renderPesoM(); return; }
   renderResumen();
 }
 
@@ -1958,6 +1956,52 @@ function renderResumen() {
     empQ = e.target.value; render();
     const n = el("empq"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   });
+}
+/* ── PESO (móvil): cuánto pesa cada posición en la cartera ── */
+function renderPesoM() {
+  const cs = comps();
+  const valOf = (c) => U.pesoBasis === "actual" ? c.current : c.value;
+  const keep = cs.filter(c => !c.sold && valOf(c) != null && valOf(c) > 0 && (c.cat === "dividenderas" || c.cat === "growth"));
+  const total = keep.reduce((s, c) => s + valOf(c), 0);
+  const hs = keep.map(c => ({ name: c.name, value: valOf(c), pct: total > 0 ? (valOf(c) / total) * 100 : 0 })).sort((a, b) => b.pct - a.pct);
+  const limit = U.pesoLimit, over = hs.filter(h => h.pct > limit);
+  const maxPct = hs.length ? Math.max(hs[0].pct, limit) : limit;
+  const col = (p) => p > limit ? "#ff5b6e" : p > limit * 0.8 ? "var(--gold)" : "var(--green)";
+  const basisLabel = U.pesoBasis === "actual" ? "valor actual" : "invertido";
+  const seg = '<div class="seg"><button data-act="pbasis" data-v="actual" class="' + (U.pesoBasis === "actual" ? "on" : "") + '">Actual</button>' +
+    '<button data-act="pbasis" data-v="invertido" class="' + (U.pesoBasis === "invertido" ? "on" : "") + '">Invertido</button></div>';
+  if (!hs.length) {
+    el("app").innerHTML = '<div class="card"><div class="ctitle">Peso en cartera' + seg + '</div><div class="empty">No hay empresas Dividenderas ni Growth con ' +
+      basisLabel + '. Márcalas en la ficha de cada empresa y añade su cotización.</div></div>';
+    return;
+  }
+  el("app").innerHTML =
+    '<div class="card pz-hero' + (over.length ? " bad" : "") + '">' +
+      '<div class="ctitle">Peso en cartera' + seg + '</div>' +
+      '<div class="pz-lab">Total ' + basisLabel + ' · ' + hs.length + ' posiciones</div>' +
+      '<div class="pz-total">' + money(total, 0) + '</div>' +
+      '<div class="pz-badges">' + (over.length ? '<span class="pz-pill bad">⚠ ' + over.length + ' sobre ' + limit + '%</span>' : '<span class="pz-pill ok">✓ Equilibrada</span>') +
+        '<button class="pz-pill lim" data-act="plimit">límite ' + limit + '% ✎</button></div></div>' +
+    (over.length ? '<div class="card" style="border-color:rgba(255,23,68,.35)"><div class="ctitle" style="color:#ff5b6e">Sobreponderadas</div>' +
+      '<div class="pz-note">Deja de aportar temporalmente y redirige a las de menor peso hasta reequilibrar.</div>' +
+      over.map(h => '<div class="pz-over">' + logo(h.name, 28) + '<span class="pz-n">' + esc(h.name) + '</span>' +
+        '<span class="pz-s">sobra ~' + money(((h.pct - limit) / 100) * total, 0) + '</span>' +
+        '<b style="color:#ff5b6e">' + h.pct.toFixed(1) + '%</b></div>').join("") + '</div>' : "") +
+    '<div class="card"><div class="ctitle">Todas las posiciones (' + hs.length + ')</div>' +
+      hs.map(h => '<div class="pz-row" data-act="emp" data-v="' + esc(h.name) + '">' +
+        '<div class="pz-top">' + logo(h.name, 24) + '<span class="pz-n">' + esc(h.name) + '</span>' +
+          '<span class="pz-s">' + money(h.value, 0) + '</span><b style="color:' + col(h.pct) + '">' + h.pct.toFixed(1) + '%</b></div>' +
+        '<div class="pz-bar"><i style="width:' + Math.min(100, h.pct / maxPct * 100) + '%;background:' + col(h.pct) + '"></i>' +
+          '<u style="left:' + Math.min(100, limit / maxPct * 100) + '%"></u></div></div>').join("") +
+      '<div class="pz-note" style="margin-top:10px">La rayita blanca marca tu límite (' + limit + '%). Toca una empresa para editarla.</div></div>';
+}
+function sheetLimit() {
+  openSheet('<h3>Límite por empresa</h3>' +
+    '<div class="sub">Porcentaje máximo que quieres que pese una sola posición</div>' +
+    '<div class="fg"><label>Límite (%)</label><input id="l-val" type="text" inputmode="decimal" value="' + U.pesoLimit + '"></div>' +
+    '<button class="btn pri" data-act="savelimit">Guardar</button>' +
+    '<button class="btn gho" data-act="cerrar">Cancelar</button>');
+  setTimeout(() => { const e = el("l-val"); if (e) { e.focus(); e.select(); } }, 260);
 }
 /* tarjeta de empresa en la búsqueda (como en el dashboard) */
 let mHist = null;
@@ -2311,6 +2355,11 @@ function accion(t) {
   if (a === "nuevo") { sheetPay(null); return; }
   if (a === "edit") { sheetPay(S.pays.filter(p => p.id === t.dataset.id)[0]); return; }
   if (a === "emp") { sheetEmp(val); return; }
+  if (a === "pbasis") { U.pesoBasis = val; saveLocal(); render(); return; }
+  if (a === "plimit") { sheetLimit(); return; }
+  if (a === "savelimit") { const n = parseFloat(vn("l-val"));
+    if (isNaN(n) || n <= 0 || n > 100) { toast("Escribe un porcentaje entre 0 y 100"); return; }
+    U.pesoLimit = n; saveLocal(); closeSheet(); toast("Límite actualizado"); render(); return; }
   if (a === "myield") { if (sheetEmp.swap) sheetEmp.swap(); return; }
   if (a === "mgain") { U.empGainMode = U.empGainMode === "pct" ? "eur" : "pct"; saveLocal(); render(); return; }
   if (a === "mhist") { mHist = mHist === val ? null : val; render(); return; }
@@ -2920,7 +2969,7 @@ main{padding:calc(var(--sat) + 124px) 14px calc(var(--sab) + 34px);max-width:560
 .vtabs{position:fixed;top:calc(var(--sat) + 58px);left:0;right:0;z-index:55;
   display:flex;gap:8px;padding:8px 14px 10px;background:rgba(10,18,32,.96);backdrop-filter:blur(18px);
   border-bottom:1px solid var(--border);max-width:560px;margin:0 auto;}
-.vtabs button{flex:1;border-radius:11px;padding:9px 0;font-size:11.5px;font-weight:800;letter-spacing:.7px;
+.vtabs button{flex:1 1 0;min-width:0;border-radius:10px;padding:8px 0;font-size:10.5px;font-weight:800;letter-spacing:.6px;
   text-transform:uppercase;color:var(--muted);background:var(--surface2);border:1px solid var(--border);
   transition:color .18s,background .18s,border-color .18s;}
 .vtabs button.on{color:#00121a;background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent;}
@@ -3035,6 +3084,27 @@ textarea.io{width:100%;height:110px;background:var(--surface2);border:1px solid 
   color:var(--accent);font-size:17px;font-weight:700;flex-shrink:0;}
 .kgp{display:flex;flex-direction:column;align-items:center;line-height:1.1;}
 .kgp small{font-size:10.5px;font-weight:600;color:var(--muted);margin-top:3px;}
+
+.ctitle .seg{margin-left:auto;}
+.pz-hero{text-align:center;border-color:rgba(0,230,118,.35);background:linear-gradient(150deg,rgba(0,230,118,.06),var(--surface) 60%);}
+.pz-hero.bad{border-color:rgba(255,23,68,.4);background:linear-gradient(150deg,rgba(255,23,68,.07),var(--surface) 60%);}
+.pz-hero .ctitle{text-align:left;}
+.pz-lab{font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:6px;}
+.pz-total{font-size:40px;font-weight:800;color:var(--gold);letter-spacing:-1px;margin:8px 0 12px;}
+.pz-badges{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;}
+.pz-pill{font-size:12px;font-weight:700;padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--surface2);color:var(--text);}
+.pz-pill.ok{color:var(--green);border-color:rgba(0,230,118,.35);background:rgba(0,230,118,.12);}
+.pz-pill.bad{color:#ff5b6e;border-color:rgba(255,23,68,.35);background:rgba(255,23,68,.12);}
+.pz-note{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:8px;}
+.pz-over{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
+.pz-n{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pz-s{font-size:11px;color:var(--muted);flex-shrink:0;}
+.pz-over b,.pz-top b{font-size:13.5px;font-weight:800;width:52px;text-align:right;flex-shrink:0;}
+.pz-row{padding:9px 0;border-top:1px solid var(--border);}
+.pz-top{display:flex;align-items:center;gap:9px;margin-bottom:7px;}
+.pz-bar{position:relative;height:6px;border-radius:4px;background:var(--surface3);}
+.pz-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;}
+.pz-bar u{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text);opacity:.55;border-radius:2px;}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
@@ -3099,6 +3169,7 @@ const HTML_MOB  = `<header class="appbar">
 <nav class="vtabs" id="vtabs">
   <button class="on" data-act="vista" data-v="resumen">Resumen</button>
   <button data-act="vista" data-v="cobros">Cobros</button>
+  <button data-act="vista" data-v="peso">Peso</button>
 </nav>
 
 <main id="app"></main>
