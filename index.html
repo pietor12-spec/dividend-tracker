@@ -3268,7 +3268,18 @@ else document.addEventListener("DOMContentLoaded", arrancarTrasPintar);
 
 <script>
 if ("serviceWorker" in navigator) {
-  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  /* actualización automática: al volver a la app se busca versión nueva y, si la hay, se recarga sola */
+  var _habiaSW = !!navigator.serviceWorker.controller, _recargado = false;
+  navigator.serviceWorker.addEventListener("controllerchange", function () {
+    if (!_habiaSW || _recargado) { _habiaSW = true; return; }
+    _recargado = true; location.reload();
+  });
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      document.addEventListener("visibilitychange", function () { if (!document.hidden) reg.update().catch(function () {}); });
+      setInterval(function () { reg.update().catch(function () {}); }, 30 * 60 * 1000);
+    }).catch(function () {});
+  });
 }
 if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () {}); }
 </script>
