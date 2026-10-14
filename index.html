@@ -14,10 +14,23 @@
 <link rel="icon" type="image/svg+xml" href="icons/logo.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>html,body{margin:0;background:#080c12;color:#e8f4fc;font-family:'Syne',ui-sans-serif,system-ui,sans-serif;}</style>
 <script src="vendor/chart.umd.min.js"></script>
+<style>
+/* tipografía incluida en la app (funciona sin conexión): Inter para todo, Syne solo para la marca */
+@font-face{font-family:'Inter';font-weight:400;font-display:swap;src:url(vendor/fonts/inter-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-weight:500;font-display:swap;src:url(vendor/fonts/inter-latin-500-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-weight:600;font-display:swap;src:url(vendor/fonts/inter-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-weight:700;font-display:swap;src:url(vendor/fonts/inter-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Inter';font-weight:800;font-display:swap;src:url(vendor/fonts/inter-latin-800-normal.woff2) format('woff2')}
+@font-face{font-family:'Syne';font-weight:700;font-display:swap;src:url(vendor/fonts/syne-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Syne';font-weight:800;font-display:swap;src:url(vendor/fonts/syne-latin-800-normal.woff2) format('woff2')}
+*{font-family:'Inter',system-ui,-apple-system,"Segoe UI",sans-serif !important;font-variant-numeric:tabular-nums;}
+.header h1,.header h1 *,.ab-tit,.ab-tit *,#splash h1,#splash h1 *{font-family:'Syne',ui-sans-serif,system-ui,sans-serif !important;}
+.kpi-label,.kpi-lab,.hero-lab,.ctitle,.chart-title,.mc-lab{letter-spacing:.9px !important;font-weight:700 !important;}
+.kpi-value,.kpi-val,.hero-val,.hd-val,.goal-big,.ring-big,.mc-big,.mono{letter-spacing:-.3px !important;font-weight:700 !important;}
+</style>
+<link rel="preload" href="vendor/fonts/inter-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
 <style>
 #splash{position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at 50% 46%,#13203a 0%,#0b1220 38%,#080c12 75%);transition:opacity .5s ease,visibility .5s;}
@@ -746,7 +759,7 @@ function initDesktop(){
 /* ---------- Chart.js base ---------- */
 const HAS_CHART = typeof Chart !== "undefined";
 if (HAS_CHART) {
-  Chart.defaults.font.family = "'JetBrains Mono', monospace";
+  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
   Chart.defaults.font.size = 10;
   Chart.defaults.color = "#6d8fb0";
 }
@@ -792,7 +805,7 @@ const BarValues = {
         const v = ds.data[i];
         if (!v) return;
         ctx.save();
-        ctx.font = "700 12px 'JetBrains Mono', monospace";
+        ctx.font = "700 12px 'Inter', system-ui, sans-serif";
         ctx.fillStyle = "#e8f4fc";
         ctx.textAlign = "center";
         ctx.textBaseline = "bottom";
@@ -2405,7 +2418,7 @@ render();
 
 
 /* ══ arranque: una interfaz u otra según la pantalla ══ */
-const CSS_DESK = `@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+const CSS_DESK = `
 
 :root {
   --bg:#080c12; --surface:#0d1420; --surface2:#111b2a; --border:#1d2d42;
@@ -2729,7 +2742,7 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
   #tab-anual .emp-card{padding-top:12px;padding-bottom:10px;}
 }
 `;
-const CSS_MOB  = `@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+const CSS_MOB  = `
 
 :root{
   --bg:#080c12; --surface:#0d1420; --surface2:#111b2a; --surface3:#16233a; --border:#1d2d42;

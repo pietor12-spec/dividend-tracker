@@ -1,7 +1,10 @@
 /* Dividend Tracker · service worker: funciona sin conexión */
-const CACHE = "dividend-tracker-v11";
+const CACHE = "dividend-tracker-v12";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "vendor/chart.umd.min.js",
-  "icons/logo.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png"];
+  "icons/logo.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png",
+  "vendor/fonts/inter-latin-400-normal.woff2", "vendor/fonts/inter-latin-500-normal.woff2", "vendor/fonts/inter-latin-600-normal.woff2",
+  "vendor/fonts/inter-latin-700-normal.woff2", "vendor/fonts/inter-latin-800-normal.woff2",
+  "vendor/fonts/syne-latin-700-normal.woff2", "vendor/fonts/syne-latin-800-normal.woff2"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
