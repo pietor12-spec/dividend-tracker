@@ -892,11 +892,12 @@ function renderResumen() {
 
     '<div class="chart-card gold"><div class="chart-head">' +
       '<div class="chart-title gold">Dividendos por mes</div>' +
-      '<div class="pill gold"><button data-act="year" data-v="-1" ' + (yIdx <= 0 ? "disabled" : "") +
+      '<div style="display:flex;align-items:center;gap:8px"><div class="pill gold' + (U.mesComp ? " dim" : "") + '"><button data-act="year" data-v="-1" ' + (yIdx <= 0 ? "disabled" : "") +
         ' style="background:none;border:none;color:inherit;cursor:pointer;font-size:13px;opacity:' + (yIdx <= 0 ? ".35" : "1") + '">‹</button>' +
         '<span>' + cy + '</span>' +
         '<button data-act="year" data-v="1" ' + (yIdx >= years.length - 1 ? "disabled" : "") +
         ' style="background:none;border:none;color:inherit;cursor:pointer;font-size:13px;opacity:' + (yIdx >= years.length - 1 ? ".35" : "1") + '">›</button></div>' +
+      '<button class="pill ' + (U.mesComp ? "cyan comp-on" : "gold comp-off") + '" data-act="mes-comp" style="cursor:pointer" title="Comparar todos los años mes a mes">Total</button></div>' +
     '</div><div class="chart-box"><canvas id="ch-mes"></canvas></div></div>' +
 
     '<div class="section-grid grid-2">' +
@@ -920,6 +921,26 @@ function renderResumen() {
     '</div>';
 
   fitDesk();
+  if (U.mesComp) {
+    /* comparativa: una columna por año en cada mes. Primer año con el color del modo, 2026 cian, luego otros */
+    const PAL = [MODE_BAR, CYAN_BAR, VIOL_BAR, (c) => grad(c.chart.ctx, c.chart.chartArea, "#ffc27a", "#e07b00"), (c) => grad(c.chart.ctx, c.chart.chartArea, "#ff9aa6", "#d92b45")];
+    const colorAno = (y, i) => y === 2026 ? CYAN_BAR : y === 2025 ? MODE_BAR : PAL[(i + 2) % PAL.length];
+    chart("ch-mes", {
+      type: "bar",
+      data: { labels: MESES, datasets: years.map((y, i) => ({
+        label: String(y),
+        data: MESES.map((_, m) => S.pays.filter(p => p.year === y && p.month === m).reduce((t, p) => t + amtOf(p), 0)),
+        backgroundColor: colorAno(y, i), borderRadius: 5, maxBarThickness: 26, categoryPercentage: .72, barPercentage: .9 })) },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, position: "top", align: "center",
+            labels: { color: "#e8f4fc", boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 3, font: { size: 11, weight: "700" } } },
+          tooltip: Object.assign({}, TT, { displayColors: true, callbacks: {
+            title: (i) => MESES_LARGO[i[0].dataIndex],
+            label: (i) => i.dataset.label + ": " + money(i.raw) + " " + S.mode } }) },
+        scales: { x: XA, y: YA } }
+    });
+    return;
+  }
   chart("ch-mes", {
     type: "bar",
     data: { labels: monthly.map(m => m.label), datasets: [{
@@ -1685,7 +1706,8 @@ document.addEventListener("click", (e) => {
   if (!t) return;
   const a = t.dataset.act, val = t.dataset.v;
 
-  if (a === "year") { const ys = Array.from(new Set(S.pays.map(p => p.year))).sort((x, y) => x - y);
+  if (a === "mes-comp") { U.mesComp = !U.mesComp; renderResumen(); return; }
+  if (a === "year") { U.mesComp = false; const ys = Array.from(new Set(S.pays.map(p => p.year))).sort((x, y) => x - y);
     const i = ys.indexOf(U.selYear); const n = Math.max(0, Math.min(ys.length - 1, i + Number(val)));
     U.selYear = ys[n]; renderResumen(); return; }
   if (a === "toggle-pay") { togglear(U.openPay, t.dataset.id); renderResumen(); return; }
@@ -1803,7 +1825,8 @@ document.getElementById("mode-seg").addEventListener("click", (e) => {
   S.mode = b.dataset.mode; saveStore(); renderAll();
 });
 document.getElementById("btn-new").addEventListener("click", () => openPayModal(null));
-document.getElementById("btn-data").addEventListener("click", openDataModal);
+document.getElementById("btn-data").addEventListener("click", () => { navClose(); openDataModal(); });
+document.getElementById("btn-logo").addEventListener("click", navOpen);
 ["ov-pay", "ov-comp", "ov-data", "ov-ask"].forEach(id => {
   const e = document.getElementById(id);
   if (e) e.addEventListener("click", (ev) => { if (ev.target.id === id) closeModals(); });
@@ -2793,6 +2816,20 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
   #tab-anual > .emp-grid{flex:0 0 auto;}
   #tab-anual .emp-card{padding-top:12px;padding-bottom:10px;}
 }
+
+/* ── cabecera: sin hamburguesa ni "Resumen ▾"; el logo abre el menú; neto/bruto en el centro ── */
+.nav-burger,.nav-current-wrap{display:none !important;}
+.header{position:sticky;}
+.header h1{font-size:28px;letter-spacing:-.6px;}
+.logo-mark{width:50px;height:50px;border-radius:12px;transition:transform .15s;}
+.logo-mark:hover{transform:scale(1.06);}
+.mode-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);}
+.mode-center button{padding:8px 20px;font-size:12.5px;}
+.nav-drawer-extra{margin-top:8px;}
+/* barritas de los títulos: amarillas en bruto, verdes en neto */
+.chart-title::before,.chart-title.gold::before,.chart-title.green::before,.chart-title.violet::before{background:var(--m) !important;}
+.pill.dim{opacity:.45;}
+.pill.comp-off{background:transparent;}
 `;
 const CSS_MOB  = `
 
@@ -3177,24 +3214,25 @@ button.ab-logo:active{transform:scale(.94);}
 .ab-mode{flex-direction:column;gap:1px;line-height:1;color:var(--m);border-color:rgba(var(--m-rgb),.45);background:rgba(var(--m-rgb),.12);}
 .ab-mode b{font-size:8.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;}
 .ab-mode i{font-style:normal;font-size:14px;font-weight:700;}
+
+.ctitle::before,.ctitle.cyan::before,.ctitle.green::before{background:var(--m) !important;}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
     <button class="nav-burger" id="btn-nav" aria-label="Menú">☰</button>
-    <div class="logo-mark" style="background:none;padding:0;overflow:hidden"><img src="icons/logo.svg" alt="Dividend Tracker" style="width:100%;height:100%;display:block"></div>
+    <button class="logo-mark" id="btn-logo" title="Menú" aria-label="Menú" style="background:none;padding:0;overflow:hidden;border:none;cursor:pointer"><img src="icons/logo.svg" alt="Dividend Tracker" style="width:100%;height:100%;display:block"></button>
     <div>
       <h1>Dividend <span>Tracker</span></h1>
     </div>
     <span class="nav-current-wrap"><span class="nav-current" id="nav-current">Resumen ▾</span></span>
   </div>
+  <div class="seg gold mode-center" id="mode-seg">
+    <button data-mode="neto">Neto</button>
+    <button data-mode="bruto">Bruto</button>
+  </div>
   <div class="header-actions">
     <div class="sync" id="sync-badge"><i></i>—</div>
-    <div class="seg gold" id="mode-seg">
-      <button data-mode="neto">Neto</button>
-      <button data-mode="bruto">Bruto</button>
-    </div>
     <button class="btn-ghost" id="btn-fs" title="Pantalla completa (F)">⛶</button>
-    <button class="btn-ghost" id="btn-data">⇅ Datos</button>
     <button class="btn-primary solo" id="btn-new" title="Nuevo dividendo" aria-label="Nuevo dividendo">＋</button>
   </div>
 </header>
@@ -3215,6 +3253,7 @@ const HTML_DESK = `<header class="header">
     <button class="tab-btn" data-tab="prevision"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"/><polyline points="15 6 21 6 21 12"/></svg><span>Previsión</span></button>
     <button class="tab-btn" data-tab="anual"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3.6v16.8h16.4"/><rect x="7" y="11" width="3" height="6" rx="1"/><rect x="12" y="7.5" width="3" height="9.5" rx="1"/><rect x="17" y="9.5" width="3" height="7.5" rx="1"/></svg><span>Por año</span></button>
   </nav>
+  <div class="nav-drawer-extra"><button class="tab-btn" id="btn-data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4v16M7 4 3.5 7.5M7 4l3.5 3.5M17 20V4m0 16-3.5-3.5M17 20l3.5-3.5"/></svg><span>Datos</span></button></div>
   <div class="nav-drawer-foot"><button id="btn-nav-hide">‹ Ocultar</button></div>
 </aside>
 
