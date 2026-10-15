@@ -1827,6 +1827,8 @@ function render() {
   Array.prototype.forEach.call(tabs, (b) => {
     b.classList.toggle("on", b.dataset.v === (U.view === "cobros" || U.view === "peso" ? U.view : "resumen"));
   });
+  const am = el("ab-mode");
+  if (am) am.innerHTML = '<b>' + (S.mode === "bruto" ? "Bruto" : "Neto") + '</b><i>⇄</i>';
   if (U.view === "cobros") { renderCobros(); return; }
   if (U.view === "peso") { renderPesoM(); return; }
   renderResumen();
@@ -1904,7 +1906,6 @@ function renderResumen() {
     '<div class="fold">' +
     '<div class="hero uni">' +
       '<div class="hrow">' +
-        '<button class="mode-sw" data-act="modo-alt" aria-label="Cambiar entre neto y bruto">' + S.mode + ' ⇄</button>' +
         '<div class="htop" data-act="modo-alt" title="Cambiar entre neto y bruto">' +
           '<div class="hero-lab">Div. totales</div>' +
           '<div class="hero-val">' + money(total, total >= 1000 ? 0 : 2) + '</div></div>' +
@@ -2357,6 +2358,7 @@ function accion(t) {
   if (a === "nuevo") { sheetPay(null); return; }
   if (a === "edit") { sheetPay(S.pays.filter(p => p.id === t.dataset.id)[0]); return; }
   if (a === "emp") { sheetEmp(val); return; }
+  if (a === "cfg") { sheetCfg(); return; }
   if (a === "pbasis") { U.pesoBasis = val; saveLocal(); render(); return; }
   if (a === "plimit") { sheetLimit(); return; }
   if (a === "savelimit") { const n = parseFloat(vn("l-val"));
@@ -2457,7 +2459,6 @@ document.addEventListener("click", (e) => {
   const t = e.target.closest("[data-act]");
   if (t) accion(t);
 });
-el("btn-cfg").addEventListener("click", sheetCfg);
 el("ov").addEventListener("click", closeSheet);
 
 
@@ -3169,6 +3170,13 @@ main{padding-top:calc(var(--sat) + 128px);}
   font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--m);
   background:rgba(var(--m-rgb),.12);border:1px solid rgba(var(--m-rgb),.4);border-radius:999px;padding:4px 10px;white-space:nowrap;}
 .mode-sw:active{opacity:.75;}
+
+/* cabecera: el logo abre Ajustes y el botón de la derecha cambia neto/bruto */
+button.ab-logo{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+button.ab-logo:active{transform:scale(.94);}
+.ab-mode{flex-direction:column;gap:1px;line-height:1;color:var(--m);border-color:rgba(var(--m-rgb),.45);background:rgba(var(--m-rgb),.12);}
+.ab-mode b{font-size:8.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;}
+.ab-mode i{font-style:normal;font-size:14px;font-weight:700;}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
@@ -3224,10 +3232,10 @@ const HTML_DESK = `<header class="header">
 <div class="ov" id="ov-ask"><div class="modal" id="modal-ask" style="max-width:380px"></div></div>
 <div class="toast" id="toast"></div>`;
 const HTML_MOB  = `<header class="appbar">
-  <div class="ab-logo" style="background:none;padding:0;overflow:hidden"><img src="icons/logo.svg" alt="Dividend Tracker" style="width:100%;height:100%;display:block"></div>
+  <button class="ab-logo" data-act="cfg" aria-label="Ajustes" style="background:none;padding:0;overflow:hidden;border:none"><img src="icons/logo.svg" alt="Dividend Tracker" style="width:100%;height:100%;display:block"></button>
   <div class="ab-tit"><b>Dividend Tracker</b></div>
   <button class="ab-btn add" data-act="nuevo" aria-label="Añadir dividendo">＋</button>
-  <button class="ab-btn" id="btn-cfg" aria-label="Ajustes">⚙</button>
+  <button class="ab-btn ab-mode" id="ab-mode" data-act="modo-alt" aria-label="Cambiar entre neto y bruto"></button>
 </header>
 
 <nav class="vtabs" id="vtabs">
