@@ -1681,6 +1681,8 @@ function renderAll(skipModal) {
   const root = document.documentElement;
   root.style.setProperty("--m", S.mode === "bruto" ? "#ffd740" : "#00e676");
   root.style.setProperty("--m-rgb", S.mode === "bruto" ? "255,215,64" : "0,230,118");
+  const dm = document.getElementById("mode-seg");
+  if (dm) dm.innerHTML = '<b>' + (S.mode === "bruto" ? "Bruto" : "Neto") + '</b><i>⇄</i>';
   Array.prototype.forEach.call(document.querySelectorAll("#mode-seg button"), b =>
     b.classList.toggle("on", b.dataset.mode === S.mode));
   let label = "Resumen";
@@ -1810,8 +1812,7 @@ document.getElementById("btn-fs").addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", () => {
   const b = document.getElementById("btn-fs");
   const on = !!document.fullscreenElement;
-  b.textContent = on ? "🡼" : "⛶";
-  b.title = on ? "Salir de pantalla completa (F)" : "Pantalla completa (F)";
+  b.style.display = on ? "none" : "";            // en pantalla completa se sale con Esc
   Object.keys(CH).forEach(k => { try { CH[k].resize(); } catch (e) {} });
 });
 document.addEventListener("keydown", (e) => {
@@ -1820,9 +1821,8 @@ document.addEventListener("keydown", (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === "f" || e.key === "F") { toggleFullscreen(); e.preventDefault(); }
 });
-document.getElementById("mode-seg").addEventListener("click", (e) => {
-  const b = e.target.closest("button"); if (!b) return;
-  S.mode = b.dataset.mode; saveStore(); renderAll();
+document.getElementById("mode-seg").addEventListener("click", () => {
+  S.mode = S.mode === "bruto" ? "neto" : "bruto"; saveStore(); renderAll();
 });
 document.getElementById("btn-new").addEventListener("click", () => openPayModal(null));
 document.getElementById("btn-data").addEventListener("click", () => { navClose(); openDataModal(); });
@@ -2830,6 +2830,16 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
 .chart-title::before,.chart-title.gold::before,.chart-title.green::before,.chart-title.violet::before{background:var(--m) !important;}
 .pill.dim{opacity:.45;}
 .pill.comp-off{background:transparent;}
+
+/* cabecera: ＋ junto al título; botón neto/bruto como en el móvil; sincronizado a su derecha */
+.header .btn-primary.solo.btn-new-big{width:48px;height:48px;min-width:48px;font-size:26px;margin-left:10px;border-radius:13px;display:flex;align-items:center;justify-content:center;padding:0;}
+.d-mode{width:56px;height:50px;border-radius:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  cursor:pointer;line-height:1;color:var(--m);border:1px solid rgba(var(--m-rgb),.45);background:rgba(var(--m-rgb),.12);transition:transform .15s;}
+.d-mode:hover{transform:scale(1.05);}
+.d-mode b{font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+.d-mode i{font-style:normal;font-size:17px;font-weight:700;}
+.header-actions{gap:12px;}
+#btn-fs{height:44px;}
 `;
 const CSS_MOB  = `
 
@@ -3224,16 +3234,13 @@ const HTML_DESK = `<header class="header">
     <div>
       <h1>Dividend <span>Tracker</span></h1>
     </div>
+    <button class="btn-primary solo btn-new-big" id="btn-new" title="Nuevo dividendo" aria-label="Nuevo dividendo">＋</button>
     <span class="nav-current-wrap"><span class="nav-current" id="nav-current">Resumen ▾</span></span>
   </div>
-  <div class="seg gold mode-center" id="mode-seg">
-    <button data-mode="neto">Neto</button>
-    <button data-mode="bruto">Bruto</button>
-  </div>
   <div class="header-actions">
+    <button class="btn-ghost" id="btn-fs" title="Pantalla completa (F) · Esc para salir">⛶</button>
+    <button class="d-mode" id="mode-seg" title="Cambiar entre neto y bruto"></button>
     <div class="sync" id="sync-badge"><i></i>—</div>
-    <button class="btn-ghost" id="btn-fs" title="Pantalla completa (F)">⛶</button>
-    <button class="btn-primary solo" id="btn-new" title="Nuevo dividendo" aria-label="Nuevo dividendo">＋</button>
   </div>
 </header>
 
