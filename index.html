@@ -892,7 +892,7 @@ function renderResumen() {
 
     '<div class="chart-card gold"><div class="chart-head">' +
       '<div class="chart-title gold">Dividendos por mes</div>' +
-      '<div style="display:flex;align-items:center;gap:8px"><div class="pill gold' + (U.mesComp ? " dim" : "") + '"><button data-act="year" data-v="-1" ' + (yIdx <= 0 ? "disabled" : "") +
+      '<div style="display:flex;align-items:center;gap:8px"><div class="pill ' + (cy === 2026 ? "cyan" : "gold") + (U.mesComp ? " dim" : "") + '"><button data-act="year" data-v="-1" ' + (yIdx <= 0 ? "disabled" : "") +
         ' style="background:none;border:none;color:inherit;cursor:pointer;font-size:13px;opacity:' + (yIdx <= 0 ? ".35" : "1") + '">‹</button>' +
         '<span>' + cy + '</span>' +
         '<button data-act="year" data-v="1" ' + (yIdx >= years.length - 1 ? "disabled" : "") +
@@ -945,7 +945,9 @@ function renderResumen() {
     type: "bar",
     data: { labels: monthly.map(m => m.label), datasets: [{
       data: monthly.map(m => m[mk]),
-      backgroundColor: (c) => (c.dataIndex === MONTH_NOW && cy === YEAR_NOW) ? CYAN_BAR(c) : (monthly[c.dataIndex][mk] > 0 ? MODE_BAR(c) : "#1d2d42"),
+      backgroundColor: (c) => (monthly[c.dataIndex][mk] <= 0) ? "#1d2d42"
+        : cy === 2026 ? ((c.dataIndex === MONTH_NOW && cy === YEAR_NOW) ? grad(c.chart.ctx, c.chart.chartArea, "#c9fbff", "#4fd8ea") : CYAN_BAR(c))
+        : (c.dataIndex === MONTH_NOW && cy === YEAR_NOW) ? CYAN_BAR(c) : MODE_BAR(c),
       borderRadius: 6, maxBarThickness: 46 }] },
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: Object.assign({}, TT, { callbacks: {
@@ -1938,9 +1940,9 @@ function renderResumen() {
       '</div>' +
       '<div class="ctitle">Div. mensuales' +
       '<span class="yearnav"><button data-act="year" data-v="-1"' + (yIdx <= 0 ? " disabled style=opacity:.3" : "") + '>‹</button>' +
-      '<span>' + cy + '</span>' +
+      '<span' + (cy === 2026 ? ' class="y26"' : '') + '>' + cy + '</span>' +
       '<button data-act="year" data-v="1"' + (yIdx >= years.length - 1 ? " disabled style=opacity:.3" : "") + '>›</button></span></div>' +
-      '<div class="bars">' + mv.map((val, i) =>
+      '<div class="bars' + (cy === 2026 ? ' y26' : '') + '">' + mv.map((val, i) =>
         '<div class="bar' + (val <= 0 ? " cero" : (i === MONTH_NOW && cy === YEAR_NOW ? " now" : "")) + '">' +
         '<span class="bt"><i style="height:' + (val > 0 ? Math.max(4, (val / maxM) * 100).toFixed(1) : 2) + '%"></i></span>' +
         '<b>' + MESES[i][0] + '</b></div>').join("") +
@@ -3226,6 +3228,13 @@ button.ab-logo:active{transform:scale(.94);}
 .ab-mode i{font-style:normal;font-size:14px;font-weight:700;}
 
 .ctitle::before,.ctitle.cyan::before,.ctitle.green::before{background:var(--m) !important;}
+
+/* 2026 en cian */
+.yearnav span.y26{color:var(--accent);}
+.bars.y26 .bar i{background:linear-gradient(180deg,#7df3ff,#00a6bd);}
+.bars.y26 .bar.now i{background:linear-gradient(180deg,#d4fcff,#5fdcee);}
+.bars.y26 .bar.cero i{background:var(--surface3);}
+.bars.y26 .bar.sel b{color:var(--accent);}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
