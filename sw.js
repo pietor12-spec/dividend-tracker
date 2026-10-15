@@ -1,5 +1,5 @@
 /* Dividend Tracker · service worker: funciona sin conexión */
-const CACHE = "dividend-tracker-v22";
+const CACHE = "dividend-tracker-v23";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "vendor/chart.umd.min.js",
   "icons/logo.svg", "icons/icon-192.png", "icons/icon-512.png", "icons/apple-touch-icon.png", "icons/favicon-32.png",
   "vendor/fonts/inter-latin-400-normal.woff2", "vendor/fonts/inter-latin-500-normal.woff2", "vendor/fonts/inter-latin-600-normal.woff2",

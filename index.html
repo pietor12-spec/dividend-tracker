@@ -533,7 +533,8 @@ function syncBadge() {
   if (!b) return;
   const ok = SYNC.mode === "cloud";
   b.className = "sync " + (ok ? "ok" : "local");
-  b.innerHTML = '<i></i>' + (ok ? (SYNC.error ? "Error al sincronizar" : "Sincronizado") : "Solo este dispositivo");
+  b.innerHTML = '<i></i>';
+  b.title = ok ? (SYNC.error ? "Error al sincronizar" : "Sincronizado") : "Solo este dispositivo";
 }
 /* ══════════════════════════════════════════════════════════════
    SINCRONIZACIÓN CON GITHUB · un Gist privado en tu cuenta
@@ -2842,6 +2843,9 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
 .d-mode i{font-style:normal;font-size:17px;font-weight:700;}
 .header-actions{gap:12px;}
 #btn-fs{height:44px;}
+
+.sync.dot-only{gap:0;margin-right:2px;cursor:default;}
+.sync.dot-only i{width:10px;height:10px;}
 `;
 const CSS_MOB  = `
 
@@ -3238,6 +3242,7 @@ button.ab-logo:active{transform:scale(.94);}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
+    <div class="sync dot-only" id="sync-badge"><i></i></div>
     <button class="nav-burger" id="btn-nav" aria-label="Menú">☰</button>
     <button class="logo-mark" id="btn-logo" title="Menú" aria-label="Menú" style="background:none;padding:0;overflow:hidden;border:none;cursor:pointer"><img src="icons/logo.svg" alt="Dividend Tracker" style="width:100%;height:100%;display:block"></button>
     <div>
@@ -3249,7 +3254,6 @@ const HTML_DESK = `<header class="header">
   <div class="header-actions">
     <button class="btn-ghost" id="btn-fs" title="Pantalla completa (F) · Esc para salir">⛶</button>
     <button class="d-mode" id="mode-seg" title="Cambiar entre neto y bruto"></button>
-    <div class="sync" id="sync-badge"><i></i>—</div>
   </div>
 </header>
 
