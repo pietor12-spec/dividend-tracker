@@ -1904,8 +1904,9 @@ function renderResumen() {
     '<div class="fold">' +
     '<div class="hero uni">' +
       '<div class="hrow">' +
+        '<button class="mode-sw" data-act="modo-alt" aria-label="Cambiar entre neto y bruto">' + S.mode + ' ⇄</button>' +
         '<div class="htop" data-act="modo-alt" title="Cambiar entre neto y bruto">' +
-          '<div class="hero-lab">Div. totales · ' + S.mode + ' ⇄</div>' +
+          '<div class="hero-lab">Div. totales</div>' +
           '<div class="hero-val">' + money(total, total >= 1000 ? 0 : 2) + '</div></div>' +
         '<div class="hdyoc"><div class="hero-lab">DYOC total</div>' +
           '<div class="hd-val">' + pct(dyocTotal) + '</div>' +
@@ -3161,6 +3162,13 @@ main{padding-top:calc(var(--sat) + 128px);}
 .pz-hero .seg{padding:2px;border-radius:8px;}
 .pz-hero .seg button{padding:4px 8px;font-size:9.5px;letter-spacing:.3px;border-radius:6px;}
 .pz-pill{font-size:11px;padding:4px 10px;}
+
+/* selector neto/bruto en el centro de la tarjeta principal */
+.hero .hrow{position:relative;}
+.mode-sw{position:absolute;left:50%;top:-5px;transform:translateX(-50%);z-index:2;
+  font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--m);
+  background:rgba(var(--m-rgb),.12);border:1px solid rgba(var(--m-rgb),.4);border-radius:999px;padding:4px 10px;white-space:nowrap;}
+.mode-sw:active{opacity:.75;}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
