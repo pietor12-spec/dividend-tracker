@@ -296,12 +296,12 @@ function setVista(x) {
 /* ── colores de las columnas por año (no dependen de neto/bruto) ──
    2025 dorado · 2026 cian · 2027 verde · luego violeta, naranja, rosa… */
 const YEAR_COLS = [
-  { y: 2025, top: "#ffe082", bot: "#d99b00", hi: "#fff3c4", solid: "#ffd740", pill: "gold" },
-  { y: 2026, top: "#7df3ff", bot: "#00a6bd", hi: "#d4fcff", solid: "#00e5ff", pill: "cyan" },
-  { y: 2027, top: "#69f0ae", bot: "#00a352", hi: "#c8fbe0", solid: "#00e676", pill: "up" },
-  { y: 2028, top: "#c4b5fd", bot: "#6d4cdb", hi: "#e9e2ff", solid: "#a78bfa", pill: "violet" },
-  { y: 2029, top: "#ffc27a", bot: "#e07b00", hi: "#ffe6c4", solid: "#ff9f43", pill: "gold" },
-  { y: 2030, top: "#ff9aa6", bot: "#d92b45", hi: "#ffd6db", solid: "#ff5b6e", pill: "down" }
+  { y: 2025, rgb: "255,215,64", top: "#ffe082", bot: "#d99b00", hi: "#fff3c4", solid: "#ffd740", pill: "gold" },
+  { y: 2026, rgb: "0,229,255", top: "#7df3ff", bot: "#00a6bd", hi: "#d4fcff", solid: "#00e5ff", pill: "cyan" },
+  { y: 2027, rgb: "0,230,118", top: "#69f0ae", bot: "#00a352", hi: "#c8fbe0", solid: "#00e676", pill: "up" },
+  { y: 2028, rgb: "167,139,250", top: "#c4b5fd", bot: "#6d4cdb", hi: "#e9e2ff", solid: "#a78bfa", pill: "violet" },
+  { y: 2029, rgb: "255,159,67", top: "#ffc27a", bot: "#e07b00", hi: "#ffe6c4", solid: "#ff9f43", pill: "gold" },
+  { y: 2030, rgb: "255,91,110", top: "#ff9aa6", bot: "#d92b45", hi: "#ffd6db", solid: "#ff5b6e", pill: "down" }
 ];
 function yearCol(y) {
   const i = ((y - 2025) % YEAR_COLS.length + YEAR_COLS.length) % YEAR_COLS.length;
@@ -887,13 +887,14 @@ function renderResumen() {
 
   const recent = S.pays.slice().sort((a, b) => (b.year - a.year) || (b.month - a.month) || ((b.day || 0) - (a.day || 0))).slice(0, 8);
 
+  const KC = { mode: "var(--m-rgb)", accent: "0,229,255", up: "0,230,118", down: "255,23,68", gold: "255,215,64", violet: "124,77,255" };
   const kpi = (label, value, cls) =>
-    '<div class="kpi-card"><div class="kpi-head"><div class="kpi-label">' + label + '</div></div>' +
+    '<div class="kpi-card" style="--kc:' + (KC[cls] || "0,229,255") + '"><div class="kpi-head"><div class="kpi-label">' + label + '</div></div>' +
     '<div class="kpi-value ' + (cls || "") + '">' + value + '</div></div>';
 
   document.getElementById("tab-resumen").innerHTML =
     '<div class="hero-grid">' +
-      '<div class="kpi-card kpi-hero"><div class="kpi-label">Dividendos totales · ' + S.mode + '</div>' +
+      '<div class="kpi-card kpi-hero" style="--hc:' + yearCol(cy).rgb + '"><div class="kpi-label">Dividendos totales</div>' +
         '<div class="kpi-value">' + money(total, total >= 1000 ? 0 : 2) + '</div>' +
         '<div class="kpi-sub">DYOC total ' + pct(dyocTotal) + '</div></div>' +
       '<div class="hero-rest">' +
@@ -1945,7 +1946,7 @@ function renderResumen() {
 
   el("app").innerHTML =
     '<div class="fold">' +
-    '<div class="hero uni">' +
+    '<div class="hero uni" style="--hc:' + yearCol(cy).rgb + '">' +
       '<div class="hrow">' +
         '<div class="htop" data-act="modo-alt" title="Cambiar entre neto y bruto">' +
           '<div class="hero-lab">Div. totales</div>' +
@@ -2861,6 +2862,15 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
 
 .sync.dot-only{gap:0;margin-right:2px;cursor:default;}
 .sync.dot-only i{width:10px;height:10px;}
+
+/* KPI principal con el color del año elegido; el resto brilla con el color de su cifra */
+.kpi-hero{border-color:rgba(var(--hc,var(--m-rgb)),.5) !important;box-shadow:0 0 34px rgba(var(--hc,var(--m-rgb)),.16);
+  background:linear-gradient(155deg,rgba(var(--hc,var(--m-rgb)),.10),var(--surface) 62%) !important;transition:border-color .25s,box-shadow .25s;}
+.kpi-hero:hover{border-color:rgba(var(--hc,var(--m-rgb)),.8) !important;box-shadow:0 0 46px rgba(var(--hc,var(--m-rgb)),.28);}
+.kpi-hero::before{background:linear-gradient(90deg,transparent,rgb(var(--hc,var(--m-rgb))),transparent) !important;}
+.kpi-card{transition:transform .2s,border-color .2s,box-shadow .2s;}
+.kpi-card:not(.kpi-hero):hover{border-color:rgba(var(--kc,0,229,255),.6);box-shadow:0 0 26px rgba(var(--kc,0,229,255),.22);}
+.kpi-card:not(.kpi-hero)::before{background:linear-gradient(90deg,transparent,rgb(var(--kc,0,229,255)),transparent);}
 `;
 const CSS_MOB  = `
 
@@ -3260,6 +3270,9 @@ button.ab-logo:active{transform:scale(.94);}
 .bars .bar.now i{background:linear-gradient(180deg,var(--bh),var(--bt));}
 .bars .bar.cero i{background:var(--surface3);}
 .bars .bar.sel b,.bars .bar.now b{color:var(--bs);}
+
+.hero.uni{border-color:rgba(var(--hc,var(--m-rgb)),.45);box-shadow:0 0 34px rgba(var(--hc,var(--m-rgb)),.14);
+  background:linear-gradient(155deg,rgba(var(--hc,var(--m-rgb)),.10),var(--surface) 62%);}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
