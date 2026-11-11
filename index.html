@@ -660,6 +660,49 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("focus", () => { if (GH.id) GH.sondear(); });
 
+/* instalar la app (botón en Ajustes / Datos) */
+let INSTALL_EVT = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); INSTALL_EVT = e; ghRefrescar(); });
+window.addEventListener("appinstalled", () => { INSTALL_EVT = null; toast("App instalada ✓"); ghRefrescar(); });
+const APP_URL = "https://pietor12-spec.github.io/dividend-tracker/";
+function enApp() { return (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+function installPanel(movil) {
+  const btn = movil ? "btn pri" : "btn-save", st = movil ? "" : "width:100%;justify-content:center;margin:0 0 8px;";
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  let h = '<div class="gh-box ins"><div class="gh-tit">📲 Instalar la app</div>';
+  if (enApp()) {
+    h += '<div class="gh-note">Estás dentro de la app instalada. Para cambiarla por la nueva (icono nuevo):</div>' +
+      '<ol class="gh-steps"><li>Desinstala esta app: mantén pulsado su icono → <b>Desinstalar</b>. Tus datos siguen en GitHub.</li>' +
+      '<li>Abre el enlace en Chrome con el botón de abajo.</li>' +
+      '<li>Allí entra en <b>⚙ Ajustes</b> (toca el logo) y pulsa <b>Instalar app</b>.</li></ol>' +
+      '<button class="' + btn + '" style="' + st + 'width:100%" data-act="ins-copy">⧉ Copiar enlace de la app</button>';
+  } else if (INSTALL_EVT) {
+    h += '<div class="gh-note">Instala Dividend Tracker en este dispositivo con el icono nuevo.</div>' +
+      '<button class="' + btn + '" style="' + st + 'width:100%" data-act="ins-go">📲 Instalar app</button>';
+  } else if (ios) {
+    h += '<div class="gh-note">En iPhone: pulsa <b>Compartir</b> (□↑) en Safari → <b>Añadir a pantalla de inicio</b>.</div>';
+  } else {
+    h += '<div class="gh-note">El navegador aún no ofrece instalarla. Si ya tienes la app antigua instalada, desinstálala primero y recarga esta página. ' +
+      'También puedes usar el menú <b>⋮</b> de Chrome → <b>Instalar app</b>.</div>' +
+      '<button class="' + (movil ? "btn gho" : "btn-ghost") + '" style="' + st + 'width:100%" data-act="ins-reload">⟳ Recargar y volver a probar</button>';
+  }
+  return h + '</div>';
+}
+async function insAccion(a) {
+  if (a === "ins-go" && INSTALL_EVT) {
+    const ev = INSTALL_EVT; INSTALL_EVT = null;
+    ev.prompt();
+    try { const r = await ev.userChoice; if (r && r.outcome === "accepted") toast("Instalando…"); } catch (e) {}
+    ghRefrescar(); return;
+  }
+  if (a === "ins-copy") {
+    try { await navigator.clipboard.writeText(APP_URL); toast("Enlace copiado: pégalo en Chrome"); }
+    catch (e) { toast(APP_URL); }
+    return;
+  }
+  if (a === "ins-reload") { location.reload(); return; }
+}
+
 /* panel de Ajustes / Datos */
 function ghPanel(movil) {
   const conectado = SYNC.mode === "cloud" && GH.id;
@@ -682,7 +725,7 @@ function ghPanel(movil) {
   }
   return h + '</div>';
 }
-const GH_CSS = '.gh-box{border:1px solid rgba(34,211,238,.35);border-radius:14px;padding:14px;margin:14px 0 18px;background:rgba(34,211,238,.05)}' +
+const GH_CSS = '.gh-box.ins{border-color:rgba(255,215,64,.4);background:rgba(255,215,64,.05)}.gh-box.ins .gh-tit{color:#ffd740}' + '.gh-box{border:1px solid rgba(34,211,238,.35);border-radius:14px;padding:14px;margin:14px 0 18px;background:rgba(34,211,238,.05)}' +
   '.gh-tit{font-weight:800;font-size:14px;color:#22d3ee;margin-bottom:6px}.gh-note{font-size:12.5px;line-height:1.5;opacity:.85;margin-bottom:10px}' +
   '.gh-steps{font-size:12.5px;line-height:1.55;padding-left:18px;margin:0 0 12px}.gh-steps a{color:#ffd740;font-weight:700}' +
   '.gh-steps code{font-family:"JetBrains Mono",monospace;font-size:11.5px}.gh-err{color:#ff6b6b;font-size:12px;margin:0 0 10px}' +
@@ -1638,7 +1681,7 @@ function saveComp() {
 function openDataModal() {
   document.getElementById("modal-data").innerHTML =
     '<div class="modal-title"><span>Tus datos</span><button class="modal-x" data-act="close-modal">✕</button></div>' +
-    ghPanel(false) +
+    installPanel(false) + ghPanel(false) +
     '<div class="note" style="margin-bottom:14px">Para pasar tus datos entre el móvil y el ordenador: en un dispositivo pulsa <b>Copiar</b> o <b>Guardar .json</b>, y en el otro pega el texto o elige el archivo. Importar reemplaza los datos de este dispositivo.</div>' +
     '<div class="kpi-label" style="margin-bottom:6px">1 · Exportar</div>' +
     '<textarea class="data-io" id="io-out" readonly>' + esc(exportPayload()) + '</textarea>' +
@@ -1809,6 +1852,7 @@ document.addEventListener("click", (e) => {
   if (a === "import-data") { importData(); return; }
   if (a === "save-json") { descargarJSON(); return; }
   if (a.indexOf("gh-") === 0) { ghAccion(a); return; }
+  if (a.indexOf("ins-") === 0) { insAccion(a); return; }
 });
 
 /* ---------- navegación lateral ---------- */
@@ -2409,7 +2453,7 @@ function sheetCfg() {
   const sy = SYNC.mode === "cloud" ? "" : '<div class="sync local"><i></i> Guardado solo en este dispositivo</div>';
   openSheet(
     '<h3>Ajustes</h3><div class="sub">' + S.pays.length + ' cobros · ' + comps().length + ' empresas · v' + VERSION + '</div>' + sy +
-    ghPanel(true) +
+    installPanel(true) + ghPanel(true) +
     '<div class="fg" style="margin-top:20px"><label>Importes</label>' +
       '<div class="seg mode" style="width:100%;display:flex">' +
       '<button style="flex:1" data-act="modo" data-v="neto" class="' + (S.mode === "neto" ? "on" : "") + '">Neto</button>' +
@@ -2499,6 +2543,7 @@ function accion(t) {
       catch (x) { toast("Selecciona el texto y cópialo"); } }); return; }
   if (a === "save-json") { descargarJSON(); return; }
   if (a.indexOf("gh-") === 0) { ghAccion(a); return; }
+  if (a.indexOf("ins-") === 0) { insAccion(a); return; }
   if (a === "importar") { try {
       const d = JSON.parse(el("io-in").value);
       if (!d || !Array.isArray(d.pays)) throw new Error();
