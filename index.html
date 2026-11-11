@@ -1967,14 +1967,12 @@ function renderResumen() {
     '<div class="fold">' +
     '<div class="hero uni" style="--hc:' + (comp ? "0,229,255" : yearCol(cy).rgb) + '">' +
       '<div class="hrow">' +
-        '<div class="htop" data-act="modo-alt" title="Cambiar entre neto y bruto">' +
+        '<div class="htop" data-act="hero-flip" title="Cambiar entre año y total">' +
           '<div class="hero-lab">' + (comp ? "Div. totales" : "Div. " + cy) + '</div>' +
           '<div class="hero-val">' + (comp ? money(total, total >= 1000 ? 0 : 2) : money(yearVal, yearVal >= 1000 ? 0 : 2)) + '</div></div>' +
         '<div class="hdyoc"><div class="hero-lab">' + (comp ? "DYOC total" : "DYOC " + cy) + '</div>' +
           '<div class="hd-val">' + pct(comp ? dyocTotal : dyocYear) + '</div>' +
           '<div class="hd-sub">' + S.mode + ' / invertido</div></div>' +
-        '<span class="hseg m"><button data-act="hero-year" class="' + (comp ? "" : "on") + '">Año</button>' +
-        '<button data-act="hero-total" class="' + (comp ? "on" : "") + '">Total</button></span>' +
       '</div>' +
       '<div class="ctitle nolab">' +
       (comp ? '<span class="ylegend">' + years.map(y => '<i style="background:' + yearCol(y).solid + '"></i>' + String(y).slice(2)).join("") + '</span>'
@@ -2451,6 +2449,7 @@ function accion(t) {
     render(); return;
   }
   if (a === "hero-year" || a === "hero-total") { U.mesComp = a === "hero-total"; render(); return; }
+  if (a === "hero-flip") { U.mesComp = !U.mesComp; render(); return; }
   if (a === "year") {
     const ys = Array.from(new Set(S.pays.map(p => p.year))).sort((x, y) => x - y);
     if (!ys.length) return;
@@ -3002,9 +3001,11 @@ main{padding:calc(var(--sat) + 124px) 14px calc(var(--sab) + 34px);max-width:560
 .bars.comp .bar.cero i{background:var(--surface3) !important;}
 .hero .hrow{position:relative;}
 .hseg.m{position:absolute;left:50%;top:-5px;transform:translateX(-50%);display:inline-flex;gap:2px;padding:2px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);}
-.hero .ctitle.nolab{justify-content:flex-end;min-height:26px;}
+.hero .ctitle.nolab{justify-content:flex-start;min-height:26px;}
 .hero .ctitle.nolab::before{display:none;}
-.hero .ctitle.nolab .yearnav,.hero .ctitle.nolab .ylegend{margin-left:auto;}
+.hero .ctitle.nolab .yearnav,.hero .ctitle.nolab .ylegend{margin-left:0 !important;}
+.hero .ctitle.nolab .ylegend i:first-child{margin-left:0;}
+.hero .htop{-webkit-tap-highlight-color:transparent;user-select:none;}
 .hseg.m button{border:0;background:none;color:var(--muted);font:700 9.5px 'Inter',sans-serif;letter-spacing:.4px;padding:3px 8px;border-radius:999px;text-transform:none;}
 .hseg.m button.on{background:rgba(var(--hc),.18);color:rgb(var(--hc));box-shadow:inset 0 0 0 1px rgba(var(--hc),.45);}
 .ylegend{display:flex;align-items:center;gap:4px;margin-left:auto;font:700 10.5px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:0;}
