@@ -895,12 +895,9 @@ function renderResumen() {
   document.getElementById("tab-resumen").innerHTML =
     '<div class="hero-grid">' +
       '<div class="kpi-card kpi-hero' + (U.mesComp ? " is-total" : "") + '" style="--hc:' + (U.mesComp ? "0,229,255" : yearCol(cy).rgb) + '">' +
-        '<div class="hero-top"><div class="kpi-label" style="margin-bottom:0">' + (U.mesComp ? "Dividendos totales" : "Dividendos " + cy) + '</div>' +
-        '<div class="hseg"><button data-act="hero-year" class="' + (U.mesComp ? "" : "on") + '">' + cy + '</button>' +
-        '<button data-act="hero-total" class="' + (U.mesComp ? "on" : "") + '">Total</button></div></div>' +
+        '<div class="kpi-label">' + (U.mesComp ? "Dividendos totales" : "Dividendos " + cy) + '</div>' +
         '<div class="kpi-value">' + (U.mesComp ? money(total, total >= 1000 ? 0 : 2) : money(yearVal, yearVal >= 1000 ? 0 : 2)) + '</div>' +
-        '<div class="kpi-sub">' + (U.mesComp ? "DYOC total " + pct(dyocTotal) + " · " + years.length + " años"
-          : "DYOC " + cy + " " + pct(dyocYear) + " · " + yearCount + " cobros") + '</div></div>' +
+        '<div class="kpi-sub">' + (U.mesComp ? "DYOC total " + pct(dyocTotal) : "DYOC " + cy + " " + pct(dyocYear)) + '</div></div>' +
       '<div class="hero-rest">' +
         (U.mesComp ? kpi("Dividendos " + cy, money(yearVal), "mode") : kpi("Dividendos totales", money(total, total >= 1000 ? 0 : 2), "mode")) +
         (U.mesComp ? kpi("Cobros totales", String(S.pays.length), "accent") : kpi("Cobros " + cy, String(yearCount), "accent")) +
@@ -941,6 +938,12 @@ function renderResumen() {
         '<div class="recent-list">' + recent.map(p => lastPayHTML(p)).join("") + '</div></div>' +
     '</div>';
 
+  const hs = document.getElementById("hdr-seg");
+  if (hs) {
+    hs.style.setProperty("--hc", U.mesComp ? "0,229,255" : yearCol(cy).rgb);
+    hs.innerHTML = '<button data-act="hero-year" class="' + (U.mesComp ? "" : "on") + '">' + cy + '</button>' +
+      '<button data-act="hero-total" class="' + (U.mesComp ? "on" : "") + '">Total</button>';
+  }
   fitDesk();
   if (U.mesComp) {
     /* comparativa: una columna por año en cada mes. Primer año con el color del modo, 2026 cian, luego otros */
@@ -1958,7 +1961,9 @@ function renderResumen() {
   const kCobros = comp ? S.pays.length : S.pays.filter(p => p.year === cy).length;
   const kSuma = comp ? total : yearVal;
   const kMedia = kSuma / (12 * (comp ? years.length : 1));
-  const kPorCobro = kCobros ? kSuma / kCobros : 0;
+  const kPorEmp = {};
+  S.pays.forEach(p => { if (comp || p.year === cy) kPorEmp[p.name] = (kPorEmp[p.name] || 0) + amtOf(p); });
+  const kTop = Object.keys(kPorEmp).map(n => ({ n: n, v: kPorEmp[n] })).sort((a, b) => b.v - a.v)[0] || null;
   const kDya = divMarket > 0 ? (comp ? divAll : divYear) / divMarket : null;
   const q = empQ.trim().toLowerCase();
   const lista = q ? cs.filter(c => c.name.toLowerCase().indexOf(q) >= 0 || (c.ticker || "").toLowerCase().indexOf(q) >= 0).slice(0, 12) : [];
@@ -1993,8 +1998,9 @@ function renderResumen() {
     '<div class="kgrid fold-k">' +
       '<div class="kpi"><div class="kpi-lab">Media mensual<br>' + kTag + '</div>' +
         '<div class="kpi-val k-mode">' + money(kMedia) + '</div></div>' +
-      '<div class="kpi"><div class="kpi-lab">Media por<br>cobro ' + kTag + '</div>' +
-        '<div class="kpi-val k-mode">' + money(kPorCobro) + '</div></div>' +
+      '<div class="kpi"><div class="kpi-lab">Mayor div.<br>' + kTag + '</div>' +
+        '<div class="kpi-val k-mode">' + (kTop ? money(kTop.v, kTop.v >= 1000 ? 0 : 2) : "—") + '</div>' +
+        '<div class="kpi-nm">' + (kTop ? esc(kTop.n) : "") + '</div></div>' +
       '<div class="kpi"><div class="kpi-lab">DYA ' + kTag + '</div>' +
         '<div class="kpi-val k-cyan">' + pct(kDya) + '</div></div>' +
       '<div class="kpi"><div class="kpi-lab">Cobros ' + kTag + '</div>' +
@@ -2637,6 +2643,8 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-he
 .hseg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);}
 .hseg button{border:0;background:none;color:var(--muted);font:700 11px 'Inter',sans-serif;letter-spacing:.4px;padding:4px 11px;border-radius:999px;cursor:pointer;transition:.15s;}
 .hseg button:hover{color:var(--text);}
+.hseg.hdr{padding:4px;height:44px;align-items:center;margin-right:4px;}
+.hseg.hdr button{font-size:13px;padding:8px 16px;height:34px;}
 .hseg button.on{background:rgba(var(--hc),.18);color:rgb(var(--hc));box-shadow:inset 0 0 0 1px rgba(var(--hc),.45);}
 .hero-rest{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:10px;}
 .hero-rest .kpi-card{padding:14px 12px;}
@@ -2983,6 +2991,7 @@ main{padding:calc(var(--sat) + 124px) 14px calc(var(--sab) + 34px);max-width:560
 .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
 .kgrid.c3{grid-template-columns:repeat(3,1fr);}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:15px;padding:13px 10px;text-align:center;}
+.kpi-nm{font-size:10px;font-weight:700;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .kpi-lab{font-size:9px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);line-height:1.3;}
 .kpi-val{font-family:'JetBrains Mono';font-size:19px;font-weight:700;margin-top:8px;letter-spacing:-.4px;}
 .k-mode{color:var(--m);} .k-cyan{color:var(--accent);} .k-up{color:var(--green);} .k-down{color:var(--red);}
@@ -3337,6 +3346,7 @@ const HTML_DESK = `<header class="header">
     <span class="nav-current-wrap"><span class="nav-current" id="nav-current">Resumen ▾</span></span>
   </div>
   <div class="header-actions">
+    <div class="hseg hdr" id="hdr-seg" title="Ver el año o el total"></div>
     <button class="btn-ghost" id="btn-fs" title="Pantalla completa (F) · Esc para salir">⛶</button>
     <button class="d-mode" id="mode-seg" title="Cambiar entre neto y bruto"></button>
   </div>
