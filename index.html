@@ -894,11 +894,15 @@ function renderResumen() {
 
   document.getElementById("tab-resumen").innerHTML =
     '<div class="hero-grid">' +
-      '<div class="kpi-card kpi-hero" style="--hc:' + yearCol(cy).rgb + '"><div class="kpi-label">Dividendos totales</div>' +
-        '<div class="kpi-value">' + money(total, total >= 1000 ? 0 : 2) + '</div>' +
-        '<div class="kpi-sub">DYOC total ' + pct(dyocTotal) + '</div></div>' +
+      '<div class="kpi-card kpi-hero' + (U.mesComp ? " is-total" : "") + '" style="--hc:' + (U.mesComp ? "0,229,255" : yearCol(cy).rgb) + '">' +
+        '<div class="hero-top"><div class="kpi-label" style="margin-bottom:0">' + (U.mesComp ? "Dividendos totales" : "Dividendos " + cy) + '</div>' +
+        '<div class="hseg"><button data-act="hero-year" class="' + (U.mesComp ? "" : "on") + '">' + cy + '</button>' +
+        '<button data-act="hero-total" class="' + (U.mesComp ? "on" : "") + '">Total</button></div></div>' +
+        '<div class="kpi-value">' + (U.mesComp ? money(total, total >= 1000 ? 0 : 2) : money(yearVal, yearVal >= 1000 ? 0 : 2)) + '</div>' +
+        '<div class="kpi-sub">' + (U.mesComp ? "DYOC total " + pct(dyocTotal) + " · " + years.length + " años"
+          : "DYOC " + cy + " " + pct(dyocYear) + " · " + yearCount + " cobros") + '</div></div>' +
       '<div class="hero-rest">' +
-        kpi("Dividendos " + cy, money(yearVal), "mode") +
+        (U.mesComp ? kpi("Dividendos " + cy, money(yearVal), "mode") : kpi("Dividendos totales", money(total, total >= 1000 ? 0 : 2), "mode")) +
         kpi("DYOC " + cy, pct(dyocYear), "accent") +
         kpi("DYA " + cy, pct(dyaYear), "accent") +
         kpi("Media mensual " + cy, money(yearVal / 12), "mode") +
@@ -1728,6 +1732,7 @@ document.addEventListener("click", (e) => {
   const a = t.dataset.act, val = t.dataset.v;
 
   if (a === "mes-comp") { U.mesComp = !U.mesComp; renderResumen(); return; }
+  if (a === "hero-year" || a === "hero-total") { U.mesComp = a === "hero-total"; renderResumen(); return; }
   if (a === "year") { U.mesComp = false; const ys = Array.from(new Set(S.pays.map(p => p.year))).sort((x, y) => x - y);
     const i = ys.indexOf(U.selYear); const n = Math.max(0, Math.min(ys.length - 1, i + Number(val)));
     U.selYear = ys[n]; renderResumen(); return; }
@@ -1920,6 +1925,12 @@ function renderResumen() {
   const mv = MESES.map((lab, i) =>
     S.pays.filter(p => p.year === cy && p.month === i).reduce((s, p) => s + amtOf(p), 0));
   const maxM = Math.max(1, ...mv);
+  /* comparativa mensual de todos los años */
+  const comp = !!U.mesComp;
+  const compSeries = years.map(y => ({ y: y, v: MESES.map((_, i) =>
+    S.pays.filter(p => p.year === y && p.month === i).reduce((s, p) => s + amtOf(p), 0)) }));
+  const compMax = MESES.map((_, i) => Math.max(0, ...compSeries.map(sr => sr.v[i])));
+  const compTop = Math.max(1, ...compMax);
 
   const yearVal = mv.reduce((a, b) => a + b, 0);
   /* DYOC: dividendos de las dividenderas en cartera sobre lo invertido en ellas */
@@ -1946,28 +1957,38 @@ function renderResumen() {
 
   el("app").innerHTML =
     '<div class="fold">' +
-    '<div class="hero uni" style="--hc:' + yearCol(cy).rgb + '">' +
+    '<div class="hero uni" style="--hc:' + (comp ? "0,229,255" : yearCol(cy).rgb) + '">' +
       '<div class="hrow">' +
         '<div class="htop" data-act="modo-alt" title="Cambiar entre neto y bruto">' +
-          '<div class="hero-lab">Div. totales</div>' +
-          '<div class="hero-val">' + money(total, total >= 1000 ? 0 : 2) + '</div></div>' +
-        '<div class="hdyoc"><div class="hero-lab">DYOC total</div>' +
-          '<div class="hd-val">' + pct(dyocTotal) + '</div>' +
+          '<div class="hero-lab">' + (comp ? "Div. totales" : "Div. " + cy) + '</div>' +
+          '<div class="hero-val">' + (comp ? money(total, total >= 1000 ? 0 : 2) : money(yearVal, yearVal >= 1000 ? 0 : 2)) + '</div></div>' +
+        '<div class="hdyoc"><div class="hero-lab">' + (comp ? "DYOC total" : "DYOC " + cy) + '</div>' +
+          '<div class="hd-val">' + pct(comp ? dyocTotal : dyocYear) + '</div>' +
           '<div class="hd-sub">' + S.mode + ' / invertido</div></div>' +
       '</div>' +
-      '<div class="ctitle">Div. mensuales' +
-      '<span class="yearnav"><button data-act="year" data-v="-1"' + (yIdx <= 0 ? " disabled style=opacity:.3" : "") + '>‹</button>' +
+      '<div class="ctitle">' + (comp ? "Comparativa" : "Div. mensuales") +
+      '<span class="hseg m"><button data-act="hero-year" class="' + (comp ? "" : "on") + '">Año</button>' +
+        '<button data-act="hero-total" class="' + (comp ? "on" : "") + '">Total</button></span>' +
+      (comp ? '<span class="ylegend">' + years.map(y => '<i style="background:' + yearCol(y).solid + '"></i>' + String(y).slice(2)).join("") + '</span>'
+      : '<span class="yearnav"><button data-act="year" data-v="-1"' + (yIdx <= 0 ? " disabled style=opacity:.3" : "") + '>‹</button>' +
       '<span style="color:' + yearCol(cy).solid + '">' + cy + '</span>' +
-      '<button data-act="year" data-v="1"' + (yIdx >= years.length - 1 ? " disabled style=opacity:.3" : "") + '>›</button></span></div>' +
-      '<div class="bars" style="--bt:' + yearCol(cy).top + ';--bb:' + yearCol(cy).bot + ';--bh:' + yearCol(cy).hi + ';--bs:' + yearCol(cy).solid + '">' + mv.map((val, i) =>
+      '<button data-act="year" data-v="1"' + (yIdx >= years.length - 1 ? " disabled style=opacity:.3" : "") + '>›</button></span>') + '</div>' +
+      (comp
+      ? '<div class="bars comp">' + MESES.map((lab, i) =>
+        '<div class="bar' + (compMax[i] <= 0 ? " cero" : "") + '"><span class="bt">' + compSeries.map(sr =>
+          '<i style="height:' + (sr.v[i] > 0 ? Math.max(3, (sr.v[i] / compTop) * 100).toFixed(1) : 1.5) + '%;background:linear-gradient(180deg,' + yearCol(sr.y).top + ',' + yearCol(sr.y).bot + ')"></i>').join("") +
+        '</span><b>' + MESES[i][0] + '</b></div>').join("") + '</div>'
+      : '<div class="bars" style="--bt:' + yearCol(cy).top + ';--bb:' + yearCol(cy).bot + ';--bh:' + yearCol(cy).hi + ';--bs:' + yearCol(cy).solid + '">' + mv.map((val, i) =>
         '<div class="bar' + (val <= 0 ? " cero" : (i === MONTH_NOW && cy === YEAR_NOW ? " now" : "")) + '">' +
         '<span class="bt"><i style="height:' + (val > 0 ? Math.max(4, (val / maxM) * 100).toFixed(1) : 2) + '%"></i></span>' +
-        '<b>' + MESES[i][0] + '</b></div>').join("") +
-      '</div></div>' +
+        '<b>' + MESES[i][0] + '</b></div>').join("") + '</div>') +
+      '</div>' +
 
     '<div class="kgrid fold-k">' +
-      '<div class="kpi"><div class="kpi-lab">Dividendos<br>' + cy + '</div>' +
-        '<div class="kpi-val k-mode">' + money(yearVal, 0) + '</div></div>' +
+      (comp ? '<div class="kpi"><div class="kpi-lab">Dividendos<br>' + cy + '</div>' +
+        '<div class="kpi-val k-mode">' + money(yearVal, 0) + '</div></div>'
+      : '<div class="kpi"><div class="kpi-lab">Dividendos<br>totales</div>' +
+        '<div class="kpi-val k-mode">' + money(total, 0) + '</div></div>') +
       '<div class="kpi"><div class="kpi-lab">Media mensual<br>' + cy + '</div>' +
         '<div class="kpi-val k-mode">' + money(yearVal / 12) + '</div></div>' +
       '<div class="kpi"><div class="kpi-lab">DYOC ' + cy + '</div>' +
@@ -1995,7 +2016,7 @@ function renderResumen() {
     '<div class="card"><div class="ctitle green">Últimos cobros<span class="sp" style="color:var(--muted)">toca para editar</span></div>' +
       (recent.length ? recent.map(p => rowPay(p)).join("") : '<div class="empty">Todavía no hay cobros.</div>') + '</div>';
 
-  wireBars(mv);
+  wireBars(mv, comp ? compSeries : null);
 
   const qe = el("empq");
   if (qe) qe.addEventListener("input", (e) => {
@@ -2084,7 +2105,7 @@ function mEmpCard(c) {
   '</div>';
 }
 /* pasar el dedo por las columnas para ver el importe del mes */
-function wireBars(mv) {
+function wireBars(mv, series) {
   const cont = document.querySelector(".bars");
   if (!cont) return;
   const tip = document.createElement("div");
@@ -2107,8 +2128,10 @@ function wireBars(mv) {
       sel = idx;
     }
     const b = bars[idx].getBoundingClientRect();
-    const barra = bars[idx].querySelector("i").getBoundingClientRect();
-    tip.innerHTML = "<b>" + MESES[idx] + "</b>" + money(mv[idx]);
+    const barra = { top: Math.min.apply(null, Array.prototype.map.call(bars[idx].querySelectorAll("i"), x => x.getBoundingClientRect().top)) };
+    tip.innerHTML = series
+      ? "<b>" + MESES[idx] + "</b>" + series.map(sr => '<span class="trow"><i style="background:' + yearCol(sr.y).solid + '"></i>' + sr.y + " " + money(sr.v[idx]) + "</span>").join("")
+      : "<b>" + MESES[idx] + "</b>" + money(mv[idx]);
     const cx = Math.min(Math.max(b.left - r.left + b.width / 2, 46), r.width - 46);
     tip.style.left = cx + "px";
     tip.style.top = Math.max(28, barra.top - r.top - 6) + "px";
@@ -2421,6 +2444,7 @@ function accion(t) {
     U.openM = i >= 0 ? U.openM.filter(x => x !== k) : U.openM.concat([k]);
     render(); return;
   }
+  if (a === "hero-year" || a === "hero-total") { U.mesComp = a === "hero-total"; render(); return; }
   if (a === "year") {
     const ys = Array.from(new Set(S.pays.map(p => p.year))).sort((x, y) => x - y);
     if (!ys.length) return;
@@ -2603,6 +2627,12 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-he
 .kpi-hero .kpi-label{font-size:11px;letter-spacing:1.8px;color:var(--muted);margin-bottom:16px;}
 .kpi-hero .kpi-value{font-size:46px;letter-spacing:-1.6px;color:var(--text);}
 .kpi-hero .kpi-sub{font-size:12px;letter-spacing:.4px;margin-top:12px;}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;}
+#tab-resumen .kpi-hero .hero-top{margin-bottom:8px;}
+.hseg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);}
+.hseg button{border:0;background:none;color:var(--muted);font:700 11px 'Inter',sans-serif;letter-spacing:.4px;padding:4px 11px;border-radius:999px;cursor:pointer;transition:.15s;}
+.hseg button:hover{color:var(--text);}
+.hseg button.on{background:rgba(var(--hc),.18);color:rgb(var(--hc));box-shadow:inset 0 0 0 1px rgba(var(--hc),.45);}
 .hero-rest{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:10px;}
 .hero-rest .kpi-card{padding:14px 12px;}
 .hero-rest .kpi-value{font-size:22px;}
@@ -2959,6 +2989,16 @@ main{padding:calc(var(--sat) + 124px) 14px calc(var(--sab) + 34px);max-width:560
   font-family:'JetBrains Mono';font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;
   box-shadow:0 8px 20px rgba(0,0,0,.55);transition:opacity .12s;z-index:6;}
 .btip.on{opacity:1;}
+.btip .trow{display:flex;align-items:center;gap:6px;font-size:11.5px;line-height:1.5;}
+.btip .trow i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+.bars.comp .bar .bt{gap:1px;}
+.bars.comp .bar i{flex:1 1 0;width:auto;min-width:0;border-radius:3px 3px 1px 1px;}
+.bars.comp .bar.cero i{background:var(--surface3) !important;}
+.hseg.m{display:inline-flex;gap:2px;padding:2px;border-radius:999px;background:var(--surface2);border:1px solid var(--border);margin-left:10px;}
+.hseg.m button{border:0;background:none;color:var(--muted);font:700 9.5px 'Inter',sans-serif;letter-spacing:.4px;padding:3px 8px;border-radius:999px;text-transform:none;}
+.hseg.m button.on{background:rgba(var(--hc),.18);color:rgb(var(--hc));box-shadow:inset 0 0 0 1px rgba(var(--hc),.45);}
+.ylegend{display:flex;align-items:center;gap:4px;margin-left:auto;font:700 10.5px 'JetBrains Mono',monospace;color:var(--muted);letter-spacing:0;}
+.ylegend i{width:8px;height:8px;border-radius:2px;display:inline-block;margin-left:5px;}
 .btip b{font-family:'Syne';font-size:9.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
   color:var(--muted);margin-right:7px;}
 .bar.sel i{filter:brightness(1.22);}
