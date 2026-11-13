@@ -2007,7 +2007,15 @@ function renderResumen() {
   const kMedia = kSuma / (12 * (comp ? years.length : 1));
   const kPorEmp = {};
   S.pays.forEach(p => { if (comp || p.year === cy) kPorEmp[p.name] = (kPorEmp[p.name] || 0) + amtOf(p); });
-  const kTop = Object.keys(kPorEmp).map(n => ({ n: n, v: kPorEmp[n] })).sort((a, b) => b.v - a.v)[0] || null;
+  /* solo dividenderas en cartera: fuera las vendidas y las de «Cagadas» (para vender) */
+  const kRank = Object.keys(kPorEmp).filter(n => divNames.has(n)).map(n => ({ n: n, v: kPorEmp[n] })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+  const kTop = kRank[0] || null, kLow = kRank.length > 1 ? kRank[kRank.length - 1] : null;
+  /* mayor / menor pagador: el nombre en color; al tocar, se ve la cifra */
+  if (!U.kpiNum) U.kpiNum = {};
+  const payKpi = (lab, it, key, col) => '<div class="kpi kpay" data-act="kpi-num" data-v="' + key + '">' +
+    '<div class="kpi-lab">' + lab + '<br>' + kTag + '</div>' +
+    '<div class="kpi-val kpay-v" style="color:' + col + '">' +
+      (!it ? "—" : U.kpiNum[key] ? money(it.v, it.v >= 1000 ? 0 : 2) : esc(it.n)) + '</div></div>';
   const kDya = divMarket > 0 ? (comp ? divAll : divYear) / divMarket : null;
   const q = empQ.trim().toLowerCase();
   const lista = q ? cs.filter(c => c.name.toLowerCase().indexOf(q) >= 0 || (c.ticker || "").toLowerCase().indexOf(q) >= 0).slice(0, 12) : [];
@@ -2042,12 +2050,10 @@ function renderResumen() {
     '<div class="kgrid fold-k">' +
       '<div class="kpi"><div class="kpi-lab">Media mensual<br>' + kTag + '</div>' +
         '<div class="kpi-val k-mode">' + money(kMedia) + '</div></div>' +
-      '<div class="kpi"><div class="kpi-lab kpi-top">' + (kTop ? esc(kTop.n) : "—") + '<br>' + kTag + '</div>' +
-        '<div class="kpi-val" style="color:var(--green)">' + (kTop ? money(kTop.v, kTop.v >= 1000 ? 0 : 2) : "—") + '</div></div>' +
+      payKpi("Mayor pagador", kTop, "top", "var(--green)") +
       '<div class="kpi"><div class="kpi-lab">DYA ' + kTag + '</div>' +
         '<div class="kpi-val k-cyan">' + pct(kDya) + '</div></div>' +
-      '<div class="kpi"><div class="kpi-lab">Cobros ' + kTag + '</div>' +
-        '<div class="kpi-val k-cyan">' + kCobros + '</div></div></div>' +
+      payKpi("Menor pagador", kLow, "low", "var(--red)") + '</div>' +
 
     '<div class="card"><div class="ctitle">Obj. mensual · ' + S.mode +
       '<button class="sp" data-act="goal" style="color:var(--accent)">✎ ' + money(goal, 0) + '</button></div>' +
@@ -2498,6 +2504,7 @@ function accion(t) {
     render(); return;
   }
   if (a === "hero-year" || a === "hero-total") { U.mesComp = a === "hero-total"; render(); return; }
+  if (a === "kpi-num") { U.kpiNum = U.kpiNum || {}; U.kpiNum[val] = !U.kpiNum[val]; render(); return; }
   if (a === "hero-flip") { U.mesComp = !U.mesComp; render(); return; }
   if (a === "year") {
     const ys = Array.from(new Set(S.pays.map(p => p.year))).sort((x, y) => x - y);
@@ -3035,7 +3042,8 @@ main{padding:calc(var(--sat) + 124px) 14px calc(var(--sab) + 34px);max-width:560
 .kgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
 .kgrid.c3{grid-template-columns:repeat(3,1fr);}
 .kpi{background:var(--surface);border:1px solid var(--border);border-radius:15px;padding:13px 10px;text-align:center;}
-.kpi-lab.kpi-top{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.kpay{cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;}
+.kpay-v{font-size:17px !important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .kpi-nm{font-size:10px;font-weight:700;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .kpi-lab{font-size:9px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);line-height:1.3;}
 .kpi-val{font-family:'JetBrains Mono';font-size:19px;font-weight:700;margin-top:8px;letter-spacing:-.4px;}
