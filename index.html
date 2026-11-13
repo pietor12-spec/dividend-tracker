@@ -1511,6 +1511,16 @@ function renderPrevision() {
     '</div>' +
     (!isAuto && auto != null ? '<div style="margin:-8px 0 16px;text-align:center">' +
       '<button class="btn-ghost" style="padding:6px 14px;font-size:11.5px" data-act="prev-auto">↺ Usar el crecimiento del Dashboard (+' + auto + '%)</button></div>' : "") +
+    '<div class="chart-card"><div class="chart-head"><div class="chart-title">Comparativa anual · dividendos por año</div></div>' +
+      '<div id="comp-anual-head" class="cmp-head"></div>' +
+      '<div class="chart-box tall"><canvas id="ch-cmp"></canvas></div>' +
+      '<div class="note" style="margin-top:10px;text-align:center">Estimado con el consenso de Financial Hub (' + String(f.asOf || "").split("-").reverse().join("/") + ') sobre tus acciones actuales. Lo cobrado sale de tus datos. ' + (S.mode === "bruto" ? "Bruto" : "Neto") + '.</div></div>' +
+    (function () { const ps = pagosSiguiente(); return '<div class="chart-card"><div class="chart-head"><div class="chart-title">Pagos previstos ' + ps.year + ' · mes a mes</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap"><span class="pill" style="color:' + yearCol(ps.year).solid + ';border-color:' + yearCol(ps.year).solid + '55">Total ' + money(ps.total, 0) + '</span>' +
+      '<span class="pill">Media ' + money(ps.total / 12, 0) + ' /mes</span></div></div>' +
+      '<div class="chart-box"><canvas id="ch-next"></canvas></div>' +
+      '<div class="note" style="margin-top:10px;text-align:center">Reparto por meses de tus cobros de ' + YEAR_NOW + ' (cobrados y previstos) de las empresas que sigues teniendo' +
+        (ps.fh ? ', ajustado al total que estima Financial Hub para ' + ps.year : '') + '. Pasa el ratón por un mes para ver qué empresas pagan.</div></div>'; })() +
     '<div class="chart-card gold"><div class="chart-head"><div class="chart-title gold">Proyección del dividendo anual</div>' +
       '<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--muted)">' +
         '<span>▬ Objetivo ' + money(goal, 0) + '/año</span><span style="color:#ff9100">▮ Real / previsto (Financial Hub)</span>' +
@@ -1526,6 +1536,20 @@ function renderPrevision() {
       '<div class="note" style="margin-top:12px">* ' + (useFh ? '2026, 2027 y 2028 según la estimación de Financial Hub (' + String(f.asOf || "").split("-").reverse().join("/") + '); desde 2029, ' : 'Desde ' + (y0 + 1) + ', ') +
         'crecimiento del ' + growth + '% anual' + (isAuto ? (dp && dp.live ? ' (el del Dashboard)' : ' (el del Dashboard al ' + String(f.asOf || "").split("-").reverse().join("/") + ')') : ' (fijado a mano)') + '. Bruto.</div></div>';
 
+  comparativaAnual();
+  const ps = pagosSiguiente(), yc = yearCol(ps.year);
+  chart("ch-next", {
+    type: "bar",
+    data: { labels: MESES, datasets: [{ data: ps.meses.map(m => Math.round(m.v * 100) / 100), borderRadius: 6, maxBarThickness: 46, borderWidth: 2,
+      borderColor: yc.solid, backgroundColor: (c) => stripes(c.chart.ctx, yc.solid) }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, TT, { displayColors: false, callbacks: {
+        title: (i) => MESES_LARGO[i[0].dataIndex] + " " + ps.year + " · " + money(i[0].raw),
+        label: () => null,
+        afterBody: (i) => { const e = ps.meses[i[0].dataIndex].emp; const l = Object.keys(e).sort((a, b) => e[b] - e[a]);
+          return l.slice(0, 8).map(n => n + ": " + money(e[n])).concat(l.length > 8 ? ["+" + (l.length - 8) + " más"] : []); } } }) },
+      scales: { x: XA, y: YA } }
+  });
   chart("ch-prev", {
     type: "bar",
     data: { labels: rows.map(r => String(r.year)), datasets: [
@@ -1573,14 +1597,10 @@ function renderAnual() {
       '<button data-act="anual-modo" data-v="anual" class="' + (anualModo === "anual" ? "on" : "") + '">Año</button></div></div>' +
       '<div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:2px 0 18px">' +
         '<span class="pill mode">Total ' + S.mode + ' ' + money(grand) + '</span>' + growthPill + '</div>' +
-      (anualModo === "anual" ? '<div id="comp-anual-head" class="cmp-head"></div>' : "") +
-      '<div class="chart-box' + (anualModo === "anual" ? " tall" : "") + '"><canvas id="ch-anual"></canvas></div>' +
-      (anualModo === "anual" ? '<div class="note" style="margin-top:10px;text-align:center">Estimado con el consenso de Financial Hub (' + ((window.DT_FH || {}).asOf || "").split("-").reverse().join("/") + ') sobre tus acciones actuales. Lo cobrado sale de tus datos.</div>' : "") +
-      '</div>' +
+      '<div class="chart-box"><canvas id="ch-anual"></canvas></div></div>' +
     '<div class="emp-grid">' + data.slice().reverse().map(y => yearCardHTML(y)).join("") + '</div>';
 
-  if (anualModo === "anual") { comparativaAnual(data, val); return; }
-  if (false) {
+  if (anualModo === "anual") {
     chart("ch-anual", {
       type: "bar",
       plugins: [BarValues],
@@ -1618,8 +1638,11 @@ function stripes(ctx, color) {
   x.beginPath(); x.moveTo(-2, 12); x.lineTo(12, -2); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(8, 12); x.lineTo(12, 8); x.stroke();
   return ctx.createPattern(c, "repeat");
 }
-function comparativaAnual(data, val) {
+function comparativaAnual() {
   const bruto = S.mode === "bruto";
+  const by = {}; S.pays.forEach(p => { by[p.year] = (by[p.year] || 0) + (bruto ? num(p.gross) : netOf(p)); });
+  const data = Object.keys(by).map(y => ({ year: +y, v: by[y] }));
+  const val = (y) => y.v;
   const hoy = new Date(); const hoyS = hoy.toISOString().slice(0, 10);
   const cob = {}; data.forEach(y => { cob[y.year] = val(y); });
   const FC = window.DT_FH || {};
@@ -1659,7 +1682,7 @@ function comparativaAnual(data, val) {
       ctx.restore();
     });
   } };
-  chart("ch-anual", {
+  chart("ch-cmp", {
     type: "bar", plugins: [TopLabels],
     data: { labels: rows.map(r => String(r.y)), datasets: [
       { label: "Cobrado", data: rows.map(r => r.c), stack: "s", borderRadius: (c) => rows[c.dataIndex] && rows[c.dataIndex].e > 0 ? { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 } : 6, borderSkipped: false, maxBarThickness: 120,
@@ -1673,6 +1696,23 @@ function comparativaAnual(data, val) {
         footer: (i) => "Total: " + money(rows[i[0].dataIndex].t) } }) },
       scales: { x: Object.assign({}, XA, { stacked: true }), y: Object.assign({}, YA, { stacked: true }) } }
   });
+}
+/* pagos previstos del año que viene, mes a mes: el reparto de este año
+   (cobrado + previsto) de las empresas que sigues teniendo, llevado al total
+   que estima Financial Hub para ese año. Cada año pasa al siguiente solo. */
+function pagosSiguiente() {
+  const bruto = S.mode === "bruto", FC = window.DT_FH || {}, ny = YEAR_NOW + 1;
+  const tiene = {}; comps().forEach(c => { if (!c.sold) tiene[c.name] = true; });
+  const amt = (p) => bruto ? num(p.gross) : num(p.gross) - num(p.re);
+  const base = S.pays.filter(p => p.year === YEAR_NOW).map(p => ({ name: p.name, month: p.month, v: bruto ? num(p.gross) : netOf(p) }))
+    .concat(fhForecasts().filter(p => p.year === YEAR_NOW).map(p => ({ name: p.name, month: p.month, v: amt(p) })))
+    .filter(x => tiene[x.name] && x.v > 0);
+  const tot = base.reduce((t, x) => t + x.v, 0);
+  const meta = FC["y" + ny] ? (bruto ? FC["y" + ny].g : FC["y" + ny].n) : null;
+  const k = meta && tot > 0 ? meta / tot : 1;
+  const meses = MESES.map(() => ({ v: 0, emp: {} }));
+  base.forEach(x => { const m = meses[x.month]; m.v += x.v * k; m.emp[x.name] = (m.emp[x.name] || 0) + x.v * k; });
+  return { year: ny, meses: meses, total: meses.reduce((t, m) => t + m.v, 0), fh: !!meta };
 }
 function yearCardHTML(y) {
   const val = (o) => S.mode === "bruto" ? o.gross : o.net;
