@@ -1573,10 +1573,14 @@ function renderAnual() {
       '<button data-act="anual-modo" data-v="anual" class="' + (anualModo === "anual" ? "on" : "") + '">Año</button></div></div>' +
       '<div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:2px 0 18px">' +
         '<span class="pill mode">Total ' + S.mode + ' ' + money(grand) + '</span>' + growthPill + '</div>' +
-      '<div class="chart-box"><canvas id="ch-anual"></canvas></div></div>' +
+      (anualModo === "anual" ? '<div id="comp-anual-head" class="cmp-head"></div>' : "") +
+      '<div class="chart-box' + (anualModo === "anual" ? " tall" : "") + '"><canvas id="ch-anual"></canvas></div>' +
+      (anualModo === "anual" ? '<div class="note" style="margin-top:10px;text-align:center">Estimado con el consenso de Financial Hub (' + ((window.DT_FH || {}).asOf || "").split("-").reverse().join("/") + ') sobre tus acciones actuales. Lo cobrado sale de tus datos.</div>' : "") +
+      '</div>' +
     '<div class="emp-grid">' + data.slice().reverse().map(y => yearCardHTML(y)).join("") + '</div>';
 
-  if (anualModo === "anual") {
+  if (anualModo === "anual") { comparativaAnual(data, val); return; }
+  if (false) {
     chart("ch-anual", {
       type: "bar",
       plugins: [BarValues],
@@ -1604,6 +1608,71 @@ function renderAnual() {
         scales: { x: XA, y: YA } }
     });
   }
+}
+/* comparativa anual: cobrado (relleno) + estimado (rayado) */
+function stripes(ctx, color) {
+  const c = document.createElement("canvas"); c.width = c.height = 10;
+  const x = c.getContext("2d");
+  x.fillStyle = "rgba(0,0,0,0)"; x.fillRect(0, 0, 10, 10);
+  x.strokeStyle = color; x.lineWidth = 2.6;
+  x.beginPath(); x.moveTo(-2, 12); x.lineTo(12, -2); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(8, 12); x.lineTo(12, 8); x.stroke();
+  return ctx.createPattern(c, "repeat");
+}
+function comparativaAnual(data, val) {
+  const bruto = S.mode === "bruto";
+  const hoy = new Date(); const hoyS = hoy.toISOString().slice(0, 10);
+  const cob = {}; data.forEach(y => { cob[y.year] = val(y); });
+  const FC = window.DT_FH || {};
+  const fcYears = Object.keys(FC).filter(k => /^y\d{4}$/.test(k)).map(k => +k.slice(1));
+  const maxY = Math.max.apply(null, Object.keys(cob).map(Number).concat(fcYears));
+  const years = []; for (let y = Math.min.apply(null, Object.keys(cob).map(Number)); y <= maxY; y++) if (y >= YEAR_NOW || cob[y]) years.push(y);
+  const rows = years.map(y => {
+    const c = cob[y] || 0;
+    let est = 0, tipo = "cobrado";
+    if (y === YEAR_NOW) {
+      est = fhForecasts().filter(p => p.year === y && (p.year * 10000 + p.month * 100 + p.day) >= (hoy.getFullYear() * 10000 + hoy.getMonth() * 100 + hoy.getDate()))
+        .reduce((t, p) => t + (bruto ? num(p.gross) : num(p.gross) - num(p.re)), 0);
+      tipo = est > 0 ? "parcial" : "cobrado";
+    } else if (y > YEAR_NOW && FC["y" + y]) {
+      est = Math.max(0, (bruto ? FC["y" + y].g : FC["y" + y].n) - c); tipo = "estimado";
+    }
+    return { y: y, c: c, e: est, t: c + est, tipo: tipo };
+  }).filter(r => r.t > 0);
+  rows.forEach((r, i) => { r.g = i > 0 && rows[i - 1].t > 0 ? (r.t - rows[i - 1].t) / rows[i - 1].t : null; });
+  const gtxt = (g) => g == null ? "" : '<b class="' + (g >= 0 ? "g-up" : "g-dn") + '">' + (g >= 0 ? "+" : "") + (g * 100).toFixed(1) + '%</b>';
+  const head = document.getElementById("comp-anual-head");
+  if (head) head.innerHTML = rows.map(r =>
+    '<div class="cmp-it"><div class="cmp-y"><i style="background:' + yearCol(r.y).solid + '"></i>' + r.y + (r.tipo !== "cobrado" ? " prev." : "") + '</div>' +
+    '<div class="cmp-v" style="color:' + yearCol(r.y).solid + '">' + money(r.t) + '</div>' +
+    '<div class="cmp-s">' + (r.tipo === "cobrado" ? "cobrado" : r.tipo === "parcial" ? "cobrado " + money(r.c, 0) + " + prev." : "estimado") +
+      (r.g != null ? " · " + gtxt(r.g) : "") + '</div></div>').join("") +
+    '<div class="cmp-leg"><span><i class="sw sol"></i>Cobrado</span><span><i class="sw str"></i>Estimado con el consenso (Financial Hub)</span></div>';
+  const TopLabels = { id: "topLabels", afterDatasetsDraw(c) {
+    const ctx = c.ctx, m0 = c.getDatasetMeta(0), m1 = c.getDatasetMeta(1);
+    rows.forEach((r, i) => {
+      const b = r.e > 0 ? m1.data[i] : m0.data[i]; if (!b) return;
+      ctx.save(); ctx.textAlign = "center";
+      ctx.font = "700 12.5px 'Inter', sans-serif"; ctx.fillStyle = yearCol(r.y).solid;
+      ctx.fillText(money(r.t, 0), b.x, b.y - (r.g != null ? 20 : 7));
+      if (r.g != null) { ctx.font = "700 10.5px 'Inter', sans-serif"; ctx.fillStyle = r.g >= 0 ? "#00e676" : "#ff5b6e";
+        ctx.fillText((r.g >= 0 ? "+" : "") + (r.g * 100).toFixed(1) + "%", b.x, b.y - 6); }
+      ctx.restore();
+    });
+  } };
+  chart("ch-anual", {
+    type: "bar", plugins: [TopLabels],
+    data: { labels: rows.map(r => String(r.y)), datasets: [
+      { label: "Cobrado", data: rows.map(r => r.c), stack: "s", borderRadius: (c) => rows[c.dataIndex] && rows[c.dataIndex].e > 0 ? { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 } : 6, borderSkipped: false, maxBarThickness: 120,
+        backgroundColor: (c) => grad(c.chart.ctx, c.chart.chartArea, yearCol(rows[c.dataIndex].y).top, yearCol(rows[c.dataIndex].y).bot) },
+      { label: "Estimado", data: rows.map(r => r.e), stack: "s", borderRadius: 6, borderSkipped: false, maxBarThickness: 120, borderWidth: 2,
+        borderColor: (c) => yearCol(rows[c.dataIndex].y).solid,
+        backgroundColor: (c) => stripes(c.chart.ctx, yearCol(rows[c.dataIndex].y).solid) } ] },
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 34 } },
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, TT, { displayColors: false, callbacks: {
+        title: (i) => i[0].label, label: (i) => i.raw > 0 ? i.dataset.label + ": " + money(i.raw) + " " + S.mode : null,
+        footer: (i) => "Total: " + money(rows[i[0].dataIndex].t) } }) },
+      scales: { x: Object.assign({}, XA, { stacked: true }), y: Object.assign({}, YA, { stacked: true }) } }
+  });
 }
 function yearCardHTML(y) {
   const val = (o) => S.mode === "bruto" ? o.gross : o.net;
@@ -2797,6 +2866,18 @@ body{font-family:'Syne',sans-serif;background:var(--bg);color:var(--text);min-he
 .kpi-hero .kpi-label{font-size:11px;letter-spacing:1.8px;color:var(--muted);margin-bottom:16px;}
 .kpi-hero .kpi-value{font-size:46px;letter-spacing:-1.6px;color:var(--text);}
 .kpi-hero .kpi-sub{font-size:12px;letter-spacing:.4px;margin-top:12px;}
+.cmp-head{display:flex;justify-content:space-around;flex-wrap:wrap;gap:14px;margin:4px 0 14px;text-align:center;}
+.cmp-it{min-width:150px;}
+.cmp-y{font:700 12px 'JetBrains Mono',monospace;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:6px;}
+.cmp-y i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.cmp-v{font:800 26px 'Inter',sans-serif;letter-spacing:-.5px;margin-top:4px;}
+.cmp-s{font:600 11px 'JetBrains Mono',monospace;color:var(--muted);margin-top:4px;}
+.cmp-s .g-up{color:#00e676}.cmp-s .g-dn{color:#ff5b6e}
+.cmp-leg{flex-basis:100%;display:flex;justify-content:center;gap:22px;font:600 11.5px 'JetBrains Mono',monospace;color:var(--text);}
+.cmp-leg span{display:flex;align-items:center;gap:7px}
+.cmp-leg .sw{width:13px;height:13px;border-radius:3px;display:inline-block;border:1.5px solid #9fb4c8;}
+.cmp-leg .sw.sol{background:#9fb4c8;}
+.cmp-leg .sw.str{background:repeating-linear-gradient(135deg,#9fb4c8 0 2px,transparent 2px 5px);}
 .hero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px;}
 #tab-resumen .kpi-hero .hero-top{margin-bottom:8px;}
 .hseg{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10);}
@@ -3045,6 +3126,10 @@ textarea.data-io{width:100%;height:88px;background:var(--bg);border:1px solid va
   #tab-anual > .chart-card .chart-head{margin-bottom:8px;}
   #tab-anual > .chart-card > div[style*="margin:2px 0 18px"]{margin:0 0 8px !important;}
   #tab-anual > .chart-card .chart-box{flex:1 1 auto;height:auto;min-height:0;}
+  #tab-anual > .chart-card .chart-box.tall{min-height:230px;}
+  #tab-anual > .chart-card:has(.cmp-head){flex:0 0 auto;min-height:0;}
+  #tab-anual > .chart-card:has(.cmp-head) .chart-box.tall{flex:none;height:clamp(230px,calc(100vh - 380px),420px);}
+  #tab-anual .cmp-head{margin:0 0 8px;}
   #tab-anual > .emp-grid{flex:0 0 auto;}
   #tab-anual .emp-card{padding-top:12px;padding-bottom:10px;}
 }
