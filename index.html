@@ -811,7 +811,7 @@ function toast(m) {
 /* la interfaz activa registra aquí su función de repintado */
 let repaint = function () {};
 
-function initDesktop(){
+/* ===== compartido por ordenador y móvil ===== */
 /* ---------- Chart.js base ---------- */
 const HAS_CHART = typeof Chart !== "undefined";
 if (HAS_CHART) {
@@ -875,6 +875,179 @@ const XA = { grid: { display: false }, border: { display: false }, ticks: { colo
 const YA = { grid: { color: "rgba(29,45,66,.55)" }, border: { display: false }, ticks: { color: "#6d8fb0", font: { size: 9 },
   callback: (v) => (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + "k" : v) } };
 
+/* ══════════════════════════════════════════════════════════════
+   FINANCIAL HUB · previsiones (foto fija, se actualiza con la tarea
+   «Actualizar Estimaciones Dividendos»). Mismo dato que el Dashboard.
+   pays: [empresa, ticker, fecha de pago, importe por acción, divisa, tipo,
+          divisor (0,81 españolas que FH da con el 19% ya quitado; 0,85 Ferrovial), multiplicador (TSMC ADR = 5)]
+   ══════════════════════════════════════════════════════════════ */
+window.DT_FH = {"asOf":"2026-11-13","fx":{"USD":1.10526,"GBP":0.83509,"HKD":8.67011,"TWD":36.466,"DKK":7.47503,"NOK":10.5633,"CAD":1.57579},"y2026":{"g":1436.22,"n":1103.01},"y2027":{"g":1704.87,"n":1311.09},"y2028":{"g":1779.04,"n":1365.55},"dash":{"base":1436,"crec":18.7},"pays":[["Verizon","VZ","2026-11-02",0.7075,"USD","Quarterly",1,1],
+  ["Inditex","ITX","2026-11-02",0.70875,"EUR","",0.81,1],
+  ["Banco Santander","SAN","2026-11-02",0.10287,"EUR","Semi-Annual",0.81,1],
+  ["ASML Holding","ASML","2026-11-04",1.88,"EUR","Quarterly",1,1],
+  ["Naturgy","NTGY","2026-11-05",0.486,"EUR","Quarterly",0.81,1],
+  ["CaixaBank","CABK","2026-11-06",0.149364,"EUR","Semi-Annual",0.81,1],
+  ["British American Tobacco","BATS","2026-11-06",0.6126,"GBP","Quarterly",1,1],
+  ["Realty Income","O","2026-11-13",0.2715,"USD","Monthly",1,1],
+  ["Colgate-Palmolive","CL","2026-11-13",0.53,"USD","Quarterly",1,1],
+  ["Procter & Gamble","PG","2026-11-16",1.0885,"USD","Quarterly",1,1],
+  ["Apple","AAPL","2026-11-16",0.27,"USD","Quarterly",1,1],
+  ["Caterpillar","CAT","2026-11-19",1.63,"USD","Quarterly",1,1],
+  ["Royal Bank of Canada","RY","2026-11-24",1.76,"CAD","Quarterly",1,1],
+  ["Odfjell Drilling","ODL","2026-11-25",2.578921,"NOK","Quarterly",1,1],
+  ["Mapfre","MAP","2026-11-26",0.0648,"EUR","Other",0.81,1],
+  ["ArcelorMittal","MT","2026-12-02",0.1352,"EUR","Quarterly",1,1],
+  ["Global Ship Lease","GSL","2026-12-03",0.6875,"USD","Quarterly",1,1],
+  ["UPS","UPS","2026-12-03",1.64,"USD","Quarterly",1,1],
+  ["Pfizer","PFE","2026-12-07",0.43,"USD","Quarterly",1,1],
+  ["Johnson & Johnson","JNJ","2026-12-08",1.34,"USD","Quarterly",1,1],
+  ["Chevron","CVX","2026-12-10",1.78,"USD","Quarterly",1,1],
+  ["Ferrovial","FER","2026-12-10",0.70975,"EUR","Other",0.85,1],
+  ["Microsoft","MSFT","2026-12-10",0.98,"USD","Quarterly",1,1],
+  ["Alphabet","GOOGL","2026-12-14",0.22,"USD","Quarterly",1,1],
+  ["Realty Income","O","2026-12-15",0.274,"USD","Monthly",1,1],
+  ["UnitedHealth Group","UNH","2026-12-15",2.32,"USD","Quarterly",1,1],
+  ["Coca-Cola","KO","2026-12-15",0.53,"USD","Quarterly",1,1],
+  ["McDonald's","MCD","2026-12-15",1.93,"USD","Quarterly",1,1],
+  ["Atresmedia","A3M","2026-12-16",0.6723,"EUR","Special",0.81,1],
+  ["Unicaja","UNI","2026-12-17",0.052002,"EUR","Other",0.81,1],
+  ["Viscofan","VIS","2026-12-21",1.134,"EUR","Semi-Annual",0.81,1],
+  ["TSMC","TSM","2027-01-07",7,"TWD","Quarterly",1,5],
+  ["Repsol","REP","2027-01-14",0.5543,"EUR","Other",0.81,1],
+  ["Versant Media Group","X06","2027-01-25",0.375,"USD","Quarterly",1,1],
+  ["Iberdrola","IBE","2027-02-01",0.22275,"EUR","Other",0.81,1],
+  ["British American Tobacco","BATS","2027-02-03",0.6126,"GBP","Quarterly",1,1]]};
+
+/* Próximos pagos de FH × tus acciones de hoy. Un previsto desaparece en cuanto
+   apuntas el cobro real de esa empresa (±12 días de la fecha). */
+function fhForecasts() {
+  const f = window.DT_FH; if (!f || !f.pays) return [];
+  const cs = {}; comps().forEach(c => { cs[c.name] = c; });
+  const ratio = (name, es) => {
+    const l = S.pays.filter(p => p.name === name && num(p.gross) > 0).sort((a, b) => (b.year - a.year) || (b.month - a.month)).slice(0, 4);
+    const g = l.reduce((s, p) => s + num(p.gross), 0);
+    if (g > 0) return l.reduce((s, p) => s + netOf(p), 0) / g;
+    if (es) return 0.81;
+    const all = S.pays.filter(p => p.year === YEAR_NOW && num(p.gross) > 0);
+    const ga = all.reduce((s, p) => s + num(p.gross), 0);
+    return ga > 0 ? all.reduce((s, p) => s + netOf(p), 0) / ga : 0.75;
+  };
+  const out = [];
+  f.pays.forEach(r => {
+    const name = r[0], d = r[2], c = cs[name];
+    if (!c || c.sold || !(num(c.shares) > 0)) return;
+    const dt = new Date(d + "T12:00:00");
+    const real = S.pays.some(p => p.name === name && p.day != null &&
+      Math.abs((new Date(p.year, p.month, p.day, 12) - dt) / 864e5) <= 12);
+    if (real) return;
+    const fx = r[4] === "EUR" ? 1 : num(f.fx[r[4]]);
+    if (!fx) return;
+    const gross = Math.round(r[3] * num(c.shares) * (r[7] || 1) / fx / (r[6] || 1) * 100) / 100;
+    const net = Math.round(gross * ratio(name, r[6] === 0.81) * 100) / 100;
+    out.push({ id: "fc-" + name + "-" + d, name: name, ticker: r[1], fc: true, kind: r[5],
+      year: dt.getFullYear(), month: dt.getMonth(), day: dt.getDate(),
+      gross: gross, re: Math.max(0, gross - net), di: 0 });
+  });
+  return out;
+}
+
+/* Proyección: igual que la del Dashboard (Dividendos → Resumen). Si el Dashboard
+   está abierto en este navegador, coge su base y su crecimiento; si no, la foto. */
+function dashProyeccion() {
+  const f = window.DT_FH || {};
+  let d = f.dash ? { base: f.dash.base, crec: f.dash.crec, live: false } : null;
+  try { const x = JSON.parse(localStorage.getItem("portfolio_divproy_v1"));
+    if (x && x.base > 0 && x.crec != null) d = { base: +x.base, crec: +x.crec, live: true }; } catch (e) {}
+  return d;
+}
+
+/* comparativa anual: cobrado (relleno) + estimado (rayado) */
+function stripes(ctx, color) {
+  const c = document.createElement("canvas"); c.width = c.height = 10;
+  const x = c.getContext("2d");
+  x.fillStyle = "rgba(0,0,0,0)"; x.fillRect(0, 0, 10, 10);
+  x.strokeStyle = color; x.lineWidth = 2.6;
+  x.beginPath(); x.moveTo(-2, 12); x.lineTo(12, -2); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(8, 12); x.lineTo(12, 8); x.stroke();
+  return ctx.createPattern(c, "repeat");
+}
+function comparativaAnual(canvasId, headId, movil) {
+  const bruto = S.mode === "bruto";
+  const by = {}; S.pays.forEach(p => { by[p.year] = (by[p.year] || 0) + (bruto ? num(p.gross) : netOf(p)); });
+  const data = Object.keys(by).map(y => ({ year: +y, v: by[y] }));
+  const val = (y) => y.v;
+  const hoy = new Date(); const hoyS = hoy.toISOString().slice(0, 10);
+  const cob = {}; data.forEach(y => { cob[y.year] = val(y); });
+  const FC = window.DT_FH || {};
+  const fcYears = Object.keys(FC).filter(k => /^y\d{4}$/.test(k)).map(k => +k.slice(1));
+  const maxY = Math.max.apply(null, Object.keys(cob).map(Number).concat(fcYears));
+  const years = []; for (let y = Math.min.apply(null, Object.keys(cob).map(Number)); y <= maxY; y++) if (y >= YEAR_NOW || cob[y]) years.push(y);
+  const rows = years.map(y => {
+    const c = cob[y] || 0;
+    let est = 0, tipo = "cobrado";
+    if (y === YEAR_NOW) {
+      est = fhForecasts().filter(p => p.year === y && (p.year * 10000 + p.month * 100 + p.day) >= (hoy.getFullYear() * 10000 + hoy.getMonth() * 100 + hoy.getDate()))
+        .reduce((t, p) => t + (bruto ? num(p.gross) : num(p.gross) - num(p.re)), 0);
+      tipo = est > 0 ? "parcial" : "cobrado";
+    } else if (y > YEAR_NOW && FC["y" + y]) {
+      est = Math.max(0, (bruto ? FC["y" + y].g : FC["y" + y].n) - c); tipo = "estimado";
+    }
+    return { y: y, c: c, e: est, t: c + est, tipo: tipo };
+  }).filter(r => r.t > 0);
+  rows.forEach((r, i) => { r.g = i > 0 && rows[i - 1].t > 0 ? (r.t - rows[i - 1].t) / rows[i - 1].t : null; });
+  const gtxt = (g) => g == null ? "" : '<b class="' + (g >= 0 ? "g-up" : "g-dn") + '">' + (g >= 0 ? "+" : "") + (g * 100).toFixed(1) + '%</b>';
+  const head = document.getElementById(headId || "comp-anual-head");
+  if (head) head.innerHTML = rows.map(r =>
+    '<div class="cmp-it"><div class="cmp-y"><i style="background:' + yearCol(r.y).solid + '"></i>' + r.y + (r.tipo !== "cobrado" ? " prev." : "") + '</div>' +
+    '<div class="cmp-v" style="color:' + yearCol(r.y).solid + '">' + money(r.t) + '</div>' +
+    '<div class="cmp-s">' + (r.tipo === "cobrado" ? "cobrado" : r.tipo === "parcial" ? "cobrado " + money(r.c, 0) + " + prev." : "estimado") +
+      (r.g != null ? " · " + gtxt(r.g) : "") + '</div></div>').join("") +
+    '<div class="cmp-leg"><span><i class="sw sol"></i>Cobrado</span><span><i class="sw str"></i>Estimado con el consenso (Financial Hub)</span></div>';
+  const TopLabels = { id: "topLabels", afterDatasetsDraw(c) {
+    const ctx = c.ctx, m0 = c.getDatasetMeta(0), m1 = c.getDatasetMeta(1);
+    rows.forEach((r, i) => {
+      const b = r.e > 0 ? m1.data[i] : m0.data[i]; if (!b) return;
+      ctx.save(); ctx.textAlign = "center";
+      ctx.font = (movil ? "700 11px" : "700 12.5px") + " 'Inter', sans-serif"; ctx.fillStyle = yearCol(r.y).solid;
+      ctx.fillText(money(r.t, 0), b.x, b.y - (r.g != null ? 20 : 7));
+      if (r.g != null) { ctx.font = "700 10.5px 'Inter', sans-serif"; ctx.fillStyle = r.g >= 0 ? "#00e676" : "#ff5b6e";
+        ctx.fillText((r.g >= 0 ? "+" : "") + (r.g * 100).toFixed(1) + "%", b.x, b.y - 6); }
+      ctx.restore();
+    });
+  } };
+  chart(canvasId || "ch-cmp", {
+    type: "bar", plugins: [TopLabels],
+    data: { labels: rows.map(r => String(r.y)), datasets: [
+      { label: "Cobrado", data: rows.map(r => r.c), stack: "s", borderRadius: (c) => rows[c.dataIndex] && rows[c.dataIndex].e > 0 ? { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 } : 6, borderSkipped: false, maxBarThickness: movil ? 52 : 120,
+        backgroundColor: (c) => grad(c.chart.ctx, c.chart.chartArea, yearCol(rows[c.dataIndex].y).top, yearCol(rows[c.dataIndex].y).bot) },
+      { label: "Estimado", data: rows.map(r => r.e), stack: "s", borderRadius: 6, borderSkipped: false, maxBarThickness: movil ? 52 : 120, borderWidth: 2,
+        borderColor: (c) => yearCol(rows[c.dataIndex].y).solid,
+        backgroundColor: (c) => stripes(c.chart.ctx, yearCol(rows[c.dataIndex].y).solid) } ] },
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 34 } },
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, TT, { displayColors: false, callbacks: {
+        title: (i) => i[0].label, label: (i) => i.raw > 0 ? i.dataset.label + ": " + money(i.raw) + " " + S.mode : null,
+        footer: (i) => "Total: " + money(rows[i[0].dataIndex].t) } }) },
+      scales: { x: Object.assign({}, XA, { stacked: true }), y: Object.assign({}, YA, { stacked: true }) } }
+  });
+}
+/* pagos previstos del año que viene, mes a mes: el reparto de este año
+   (cobrado + previsto) de las empresas que sigues teniendo, llevado al total
+   que estima Financial Hub para ese año. Cada año pasa al siguiente solo. */
+function pagosSiguiente() {
+  const bruto = S.mode === "bruto", FC = window.DT_FH || {}, ny = YEAR_NOW + 1;
+  const tiene = {}; comps().forEach(c => { if (!c.sold) tiene[c.name] = true; });
+  const amt = (p) => bruto ? num(p.gross) : num(p.gross) - num(p.re);
+  const base = S.pays.filter(p => p.year === YEAR_NOW).map(p => ({ name: p.name, month: p.month, v: bruto ? num(p.gross) : netOf(p) }))
+    .concat(fhForecasts().filter(p => p.year === YEAR_NOW).map(p => ({ name: p.name, month: p.month, v: amt(p) })))
+    .filter(x => tiene[x.name] && x.v > 0);
+  const tot = base.reduce((t, x) => t + x.v, 0);
+  const meta = FC["y" + ny] ? (bruto ? FC["y" + ny].g : FC["y" + ny].n) : null;
+  const k = meta && tot > 0 ? meta / tot : 1;
+  const meses = MESES.map(() => ({ v: 0, emp: {} }));
+  base.forEach(x => { const m = meses[x.month]; m.v += x.v * k; m.emp[x.name] = (m.emp[x.name] || 0) + x.v * k; });
+  return { year: ny, meses: meses, total: meses.reduce((t, m) => t + m.v, 0), fh: !!meta };
+}
+
+function initDesktop(){
 /* ══════════════════════════════════════════════════════════════
    RESUMEN
    ══════════════════════════════════════════════════════════════ */
@@ -1304,92 +1477,6 @@ function renderPeso() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   FINANCIAL HUB · previsiones (foto fija, se actualiza con la tarea
-   «Actualizar Estimaciones Dividendos»). Mismo dato que el Dashboard.
-   pays: [empresa, ticker, fecha de pago, importe por acción, divisa, tipo,
-          divisor (0,81 españolas que FH da con el 19% ya quitado; 0,85 Ferrovial), multiplicador (TSMC ADR = 5)]
-   ══════════════════════════════════════════════════════════════ */
-window.DT_FH = {"asOf":"2026-11-13","fx":{"USD":1.10526,"GBP":0.83509,"HKD":8.67011,"TWD":36.466,"DKK":7.47503,"NOK":10.5633,"CAD":1.57579},"y2026":{"g":1436.22,"n":1103.01},"y2027":{"g":1704.87,"n":1311.09},"y2028":{"g":1779.04,"n":1365.55},"dash":{"base":1436,"crec":18.7},"pays":[["Verizon","VZ","2026-11-02",0.7075,"USD","Quarterly",1,1],
-  ["Inditex","ITX","2026-11-02",0.70875,"EUR","",0.81,1],
-  ["Banco Santander","SAN","2026-11-02",0.10287,"EUR","Semi-Annual",0.81,1],
-  ["ASML Holding","ASML","2026-11-04",1.88,"EUR","Quarterly",1,1],
-  ["Naturgy","NTGY","2026-11-05",0.486,"EUR","Quarterly",0.81,1],
-  ["CaixaBank","CABK","2026-11-06",0.149364,"EUR","Semi-Annual",0.81,1],
-  ["British American Tobacco","BATS","2026-11-06",0.6126,"GBP","Quarterly",1,1],
-  ["Realty Income","O","2026-11-13",0.2715,"USD","Monthly",1,1],
-  ["Colgate-Palmolive","CL","2026-11-13",0.53,"USD","Quarterly",1,1],
-  ["Procter & Gamble","PG","2026-11-16",1.0885,"USD","Quarterly",1,1],
-  ["Apple","AAPL","2026-11-16",0.27,"USD","Quarterly",1,1],
-  ["Caterpillar","CAT","2026-11-19",1.63,"USD","Quarterly",1,1],
-  ["Royal Bank of Canada","RY","2026-11-24",1.76,"CAD","Quarterly",1,1],
-  ["Odfjell Drilling","ODL","2026-11-25",2.578921,"NOK","Quarterly",1,1],
-  ["Mapfre","MAP","2026-11-26",0.0648,"EUR","Other",0.81,1],
-  ["ArcelorMittal","MT","2026-12-02",0.1352,"EUR","Quarterly",1,1],
-  ["Global Ship Lease","GSL","2026-12-03",0.6875,"USD","Quarterly",1,1],
-  ["UPS","UPS","2026-12-03",1.64,"USD","Quarterly",1,1],
-  ["Pfizer","PFE","2026-12-07",0.43,"USD","Quarterly",1,1],
-  ["Johnson & Johnson","JNJ","2026-12-08",1.34,"USD","Quarterly",1,1],
-  ["Chevron","CVX","2026-12-10",1.78,"USD","Quarterly",1,1],
-  ["Ferrovial","FER","2026-12-10",0.70975,"EUR","Other",0.85,1],
-  ["Microsoft","MSFT","2026-12-10",0.98,"USD","Quarterly",1,1],
-  ["Alphabet","GOOGL","2026-12-14",0.22,"USD","Quarterly",1,1],
-  ["Realty Income","O","2026-12-15",0.274,"USD","Monthly",1,1],
-  ["UnitedHealth Group","UNH","2026-12-15",2.32,"USD","Quarterly",1,1],
-  ["Coca-Cola","KO","2026-12-15",0.53,"USD","Quarterly",1,1],
-  ["McDonald's","MCD","2026-12-15",1.93,"USD","Quarterly",1,1],
-  ["Atresmedia","A3M","2026-12-16",0.6723,"EUR","Special",0.81,1],
-  ["Unicaja","UNI","2026-12-17",0.052002,"EUR","Other",0.81,1],
-  ["Viscofan","VIS","2026-12-21",1.134,"EUR","Semi-Annual",0.81,1],
-  ["TSMC","TSM","2027-01-07",7,"TWD","Quarterly",1,5],
-  ["Repsol","REP","2027-01-14",0.5543,"EUR","Other",0.81,1],
-  ["Versant Media Group","X06","2027-01-25",0.375,"USD","Quarterly",1,1],
-  ["Iberdrola","IBE","2027-02-01",0.22275,"EUR","Other",0.81,1],
-  ["British American Tobacco","BATS","2027-02-03",0.6126,"GBP","Quarterly",1,1]]};
-
-/* Próximos pagos de FH × tus acciones de hoy. Un previsto desaparece en cuanto
-   apuntas el cobro real de esa empresa (±12 días de la fecha). */
-function fhForecasts() {
-  const f = window.DT_FH; if (!f || !f.pays) return [];
-  const cs = {}; comps().forEach(c => { cs[c.name] = c; });
-  const ratio = (name, es) => {
-    const l = S.pays.filter(p => p.name === name && num(p.gross) > 0).sort((a, b) => (b.year - a.year) || (b.month - a.month)).slice(0, 4);
-    const g = l.reduce((s, p) => s + num(p.gross), 0);
-    if (g > 0) return l.reduce((s, p) => s + netOf(p), 0) / g;
-    if (es) return 0.81;
-    const all = S.pays.filter(p => p.year === YEAR_NOW && num(p.gross) > 0);
-    const ga = all.reduce((s, p) => s + num(p.gross), 0);
-    return ga > 0 ? all.reduce((s, p) => s + netOf(p), 0) / ga : 0.75;
-  };
-  const out = [];
-  f.pays.forEach(r => {
-    const name = r[0], d = r[2], c = cs[name];
-    if (!c || c.sold || !(num(c.shares) > 0)) return;
-    const dt = new Date(d + "T12:00:00");
-    const real = S.pays.some(p => p.name === name && p.day != null &&
-      Math.abs((new Date(p.year, p.month, p.day, 12) - dt) / 864e5) <= 12);
-    if (real) return;
-    const fx = r[4] === "EUR" ? 1 : num(f.fx[r[4]]);
-    if (!fx) return;
-    const gross = Math.round(r[3] * num(c.shares) * (r[7] || 1) / fx / (r[6] || 1) * 100) / 100;
-    const net = Math.round(gross * ratio(name, r[6] === 0.81) * 100) / 100;
-    out.push({ id: "fc-" + name + "-" + d, name: name, ticker: r[1], fc: true, kind: r[5],
-      year: dt.getFullYear(), month: dt.getMonth(), day: dt.getDate(),
-      gross: gross, re: Math.max(0, gross - net), di: 0 });
-  });
-  return out;
-}
-
-/* Proyección: igual que la del Dashboard (Dividendos → Resumen). Si el Dashboard
-   está abierto en este navegador, coge su base y su crecimiento; si no, la foto. */
-function dashProyeccion() {
-  const f = window.DT_FH || {};
-  let d = f.dash ? { base: f.dash.base, crec: f.dash.crec, live: false } : null;
-  try { const x = JSON.parse(localStorage.getItem("portfolio_divproy_v1"));
-    if (x && x.base > 0 && x.crec != null) d = { base: +x.base, crec: +x.crec, live: true }; } catch (e) {}
-  return d;
-}
-
-/* ══════════════════════════════════════════════════════════════
    CALENDARIO  (cobros reales + previstos de Financial Hub)
    ══════════════════════════════════════════════════════════════ */
 function renderCalendario() {
@@ -1628,91 +1715,6 @@ function renderAnual() {
         scales: { x: XA, y: YA } }
     });
   }
-}
-/* comparativa anual: cobrado (relleno) + estimado (rayado) */
-function stripes(ctx, color) {
-  const c = document.createElement("canvas"); c.width = c.height = 10;
-  const x = c.getContext("2d");
-  x.fillStyle = "rgba(0,0,0,0)"; x.fillRect(0, 0, 10, 10);
-  x.strokeStyle = color; x.lineWidth = 2.6;
-  x.beginPath(); x.moveTo(-2, 12); x.lineTo(12, -2); x.moveTo(-2, 2); x.lineTo(2, -2); x.moveTo(8, 12); x.lineTo(12, 8); x.stroke();
-  return ctx.createPattern(c, "repeat");
-}
-function comparativaAnual() {
-  const bruto = S.mode === "bruto";
-  const by = {}; S.pays.forEach(p => { by[p.year] = (by[p.year] || 0) + (bruto ? num(p.gross) : netOf(p)); });
-  const data = Object.keys(by).map(y => ({ year: +y, v: by[y] }));
-  const val = (y) => y.v;
-  const hoy = new Date(); const hoyS = hoy.toISOString().slice(0, 10);
-  const cob = {}; data.forEach(y => { cob[y.year] = val(y); });
-  const FC = window.DT_FH || {};
-  const fcYears = Object.keys(FC).filter(k => /^y\d{4}$/.test(k)).map(k => +k.slice(1));
-  const maxY = Math.max.apply(null, Object.keys(cob).map(Number).concat(fcYears));
-  const years = []; for (let y = Math.min.apply(null, Object.keys(cob).map(Number)); y <= maxY; y++) if (y >= YEAR_NOW || cob[y]) years.push(y);
-  const rows = years.map(y => {
-    const c = cob[y] || 0;
-    let est = 0, tipo = "cobrado";
-    if (y === YEAR_NOW) {
-      est = fhForecasts().filter(p => p.year === y && (p.year * 10000 + p.month * 100 + p.day) >= (hoy.getFullYear() * 10000 + hoy.getMonth() * 100 + hoy.getDate()))
-        .reduce((t, p) => t + (bruto ? num(p.gross) : num(p.gross) - num(p.re)), 0);
-      tipo = est > 0 ? "parcial" : "cobrado";
-    } else if (y > YEAR_NOW && FC["y" + y]) {
-      est = Math.max(0, (bruto ? FC["y" + y].g : FC["y" + y].n) - c); tipo = "estimado";
-    }
-    return { y: y, c: c, e: est, t: c + est, tipo: tipo };
-  }).filter(r => r.t > 0);
-  rows.forEach((r, i) => { r.g = i > 0 && rows[i - 1].t > 0 ? (r.t - rows[i - 1].t) / rows[i - 1].t : null; });
-  const gtxt = (g) => g == null ? "" : '<b class="' + (g >= 0 ? "g-up" : "g-dn") + '">' + (g >= 0 ? "+" : "") + (g * 100).toFixed(1) + '%</b>';
-  const head = document.getElementById("comp-anual-head");
-  if (head) head.innerHTML = rows.map(r =>
-    '<div class="cmp-it"><div class="cmp-y"><i style="background:' + yearCol(r.y).solid + '"></i>' + r.y + (r.tipo !== "cobrado" ? " prev." : "") + '</div>' +
-    '<div class="cmp-v" style="color:' + yearCol(r.y).solid + '">' + money(r.t) + '</div>' +
-    '<div class="cmp-s">' + (r.tipo === "cobrado" ? "cobrado" : r.tipo === "parcial" ? "cobrado " + money(r.c, 0) + " + prev." : "estimado") +
-      (r.g != null ? " · " + gtxt(r.g) : "") + '</div></div>').join("") +
-    '<div class="cmp-leg"><span><i class="sw sol"></i>Cobrado</span><span><i class="sw str"></i>Estimado con el consenso (Financial Hub)</span></div>';
-  const TopLabels = { id: "topLabels", afterDatasetsDraw(c) {
-    const ctx = c.ctx, m0 = c.getDatasetMeta(0), m1 = c.getDatasetMeta(1);
-    rows.forEach((r, i) => {
-      const b = r.e > 0 ? m1.data[i] : m0.data[i]; if (!b) return;
-      ctx.save(); ctx.textAlign = "center";
-      ctx.font = "700 12.5px 'Inter', sans-serif"; ctx.fillStyle = yearCol(r.y).solid;
-      ctx.fillText(money(r.t, 0), b.x, b.y - (r.g != null ? 20 : 7));
-      if (r.g != null) { ctx.font = "700 10.5px 'Inter', sans-serif"; ctx.fillStyle = r.g >= 0 ? "#00e676" : "#ff5b6e";
-        ctx.fillText((r.g >= 0 ? "+" : "") + (r.g * 100).toFixed(1) + "%", b.x, b.y - 6); }
-      ctx.restore();
-    });
-  } };
-  chart("ch-cmp", {
-    type: "bar", plugins: [TopLabels],
-    data: { labels: rows.map(r => String(r.y)), datasets: [
-      { label: "Cobrado", data: rows.map(r => r.c), stack: "s", borderRadius: (c) => rows[c.dataIndex] && rows[c.dataIndex].e > 0 ? { topLeft: 0, topRight: 0, bottomLeft: 6, bottomRight: 6 } : 6, borderSkipped: false, maxBarThickness: 120,
-        backgroundColor: (c) => grad(c.chart.ctx, c.chart.chartArea, yearCol(rows[c.dataIndex].y).top, yearCol(rows[c.dataIndex].y).bot) },
-      { label: "Estimado", data: rows.map(r => r.e), stack: "s", borderRadius: 6, borderSkipped: false, maxBarThickness: 120, borderWidth: 2,
-        borderColor: (c) => yearCol(rows[c.dataIndex].y).solid,
-        backgroundColor: (c) => stripes(c.chart.ctx, yearCol(rows[c.dataIndex].y).solid) } ] },
-    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 34 } },
-      plugins: { legend: { display: false }, tooltip: Object.assign({}, TT, { displayColors: false, callbacks: {
-        title: (i) => i[0].label, label: (i) => i.raw > 0 ? i.dataset.label + ": " + money(i.raw) + " " + S.mode : null,
-        footer: (i) => "Total: " + money(rows[i[0].dataIndex].t) } }) },
-      scales: { x: Object.assign({}, XA, { stacked: true }), y: Object.assign({}, YA, { stacked: true }) } }
-  });
-}
-/* pagos previstos del año que viene, mes a mes: el reparto de este año
-   (cobrado + previsto) de las empresas que sigues teniendo, llevado al total
-   que estima Financial Hub para ese año. Cada año pasa al siguiente solo. */
-function pagosSiguiente() {
-  const bruto = S.mode === "bruto", FC = window.DT_FH || {}, ny = YEAR_NOW + 1;
-  const tiene = {}; comps().forEach(c => { if (!c.sold) tiene[c.name] = true; });
-  const amt = (p) => bruto ? num(p.gross) : num(p.gross) - num(p.re);
-  const base = S.pays.filter(p => p.year === YEAR_NOW).map(p => ({ name: p.name, month: p.month, v: bruto ? num(p.gross) : netOf(p) }))
-    .concat(fhForecasts().filter(p => p.year === YEAR_NOW).map(p => ({ name: p.name, month: p.month, v: amt(p) })))
-    .filter(x => tiene[x.name] && x.v > 0);
-  const tot = base.reduce((t, x) => t + x.v, 0);
-  const meta = FC["y" + ny] ? (bruto ? FC["y" + ny].g : FC["y" + ny].n) : null;
-  const k = meta && tot > 0 ? meta / tot : 1;
-  const meses = MESES.map(() => ({ v: 0, emp: {} }));
-  base.forEach(x => { const m = meses[x.month]; m.v += x.v * k; m.emp[x.name] = (m.emp[x.name] || 0) + x.v * k; });
-  return { year: ny, meses: meses, total: meses.reduce((t, m) => t + m.v, 0), fh: !!meta };
 }
 function yearCardHTML(y) {
   const val = (o) => S.mode === "bruto" ? o.gross : o.net;
@@ -2134,14 +2136,24 @@ let empQ = "";
 function render() {
   document.documentElement.style.setProperty("--m", S.mode === "bruto" ? "#ffd740" : "#00e676");
   document.documentElement.style.setProperty("--m-rgb", S.mode === "bruto" ? "255,215,64" : "0,230,118");
+  const VISTAS = ["resumen", "cobros", "empresas", "peso", "calendario", "prevision", "anual"];
+  if (VISTAS.indexOf(U.view) < 0) U.view = "resumen";
   const tabs = document.querySelectorAll("#vtabs button");
   Array.prototype.forEach.call(tabs, (b) => {
-    b.classList.toggle("on", b.dataset.v === (U.view === "cobros" || U.view === "peso" ? U.view : "resumen"));
+    const on = b.dataset.v === U.view;
+    b.classList.toggle("on", on);
+    if (on && b.scrollIntoView && render._ult !== U.view) { const nav = el("vtabs");
+      if (nav) nav.scrollTo({ left: b.offsetLeft - (nav.clientWidth - b.offsetWidth) / 2, behavior: render._ult ? "smooth" : "auto" }); }
   });
+  render._ult = U.view;
   const am = el("ab-mode");
   if (am) am.innerHTML = '<b>' + (S.mode === "bruto" ? "Bruto" : "Neto") + '</b><i>⇄</i>';
   if (U.view === "cobros") { renderCobros(); return; }
   if (U.view === "peso") { renderPesoM(); return; }
+  if (U.view === "empresas") { renderEmpresasM(); return; }
+  if (U.view === "calendario") { renderCalendarioM(); return; }
+  if (U.view === "prevision") { renderPrevisionM(); return; }
+  if (U.view === "anual") { renderAnualM(); return; }
   renderResumen();
 }
 
@@ -2299,6 +2311,212 @@ function renderResumen() {
     empQ = e.target.value; render();
     const n = el("empq"); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); }
   });
+}
+/* ══ EMPRESAS (móvil) ══ */
+const M_EMP_TABS = [["encartera", "En cartera"], ["dividenderas", "Dividenderas"], ["growth", "Growth"], ["cagadas", "Cagadas"], ["vendidas", "Vendidas"]];
+const M_EMP_SORTS = [["div", "Dividendos"], ["name", "Nombre"], ["gan", "G/P"], ["dyoc", "DYOC"], ["peso", "Peso"]];
+function mEmpLista() {
+  const cs = comps();
+  const f = U.empFilter;
+  const inF = (c) => f === "encartera" ? !c.sold : f === "vendidas" ? c.sold : (c.cat === f && !c.sold);
+  const ql = empQ.trim().toLowerCase();
+  const keepTotal = cs.filter(c => !c.sold && c.current != null && (c.cat === "dividenderas" || c.cat === "growth")).reduce((t, c) => t + c.current, 0);
+  const sv = (c) => {
+    if (U.empSort === "name") return c.name.toLowerCase();
+    if (U.empSort === "div") return (S.mode === "bruto" ? c.grossTotal : c.netTotal) || 0;
+    if (U.empSort === "dyoc") return (!c.sold && c.value > 0) ? c.annualGross / c.value : -Infinity;
+    if (U.empSort === "peso") return (!c.sold && c.current != null && keepTotal > 0) ? c.current / keepTotal : -Infinity;
+    return (c.sold || c.current == null || c.value == null) ? -Infinity : (c.current - c.value);
+  };
+  const asc = U.empSort === "name";
+  return cs.filter(inF).filter(c => !ql || c.name.toLowerCase().indexOf(ql) >= 0 || (c.ticker || "").toLowerCase().indexOf(ql) >= 0)
+    .sort((a, b) => { const x = sv(a), y = sv(b); return x < y ? (asc ? -1 : 1) : x > y ? (asc ? 1 : -1) : 0; });
+}
+function renderEmpresasM() {
+  const cs = comps();
+  if (!M_EMP_TABS.some(t => t[0] === U.empFilter)) U.empFilter = "encartera";
+  if (!M_EMP_SORTS.some(t => t[0] === U.empSort)) U.empSort = "div";
+  const cnt = (k) => cs.filter(c => k === "encartera" ? !c.sold : k === "vendidas" ? c.sold : (c.cat === k && !c.sold)).length;
+  el("app").innerHTML =
+    '<div class="m-sticky">' +
+      '<div class="search">🔍<input id="empq2" placeholder="Buscar por nombre o ticker…" value="' + esc(empQ) + '" autocomplete="off"></div>' +
+      '<div class="filters">' + M_EMP_TABS.map(t => '<button class="fchip' + (U.empFilter === t[0] ? " on" : "") + '" data-act="mefil" data-v="' + t[0] + '">' + t[1] + ' <i>' + cnt(t[0]) + '</i></button>').join("") + '</div>' +
+      '<div class="filters sorts"><span class="slab">Ordenar</span>' + M_EMP_SORTS.map(t => '<button class="fchip sm' + (U.empSort === t[0] ? " on" : "") + '" data-act="mesort" data-v="' + t[0] + '">' + t[1] + '</button>').join("") + '</div>' +
+    '</div>' +
+    '<div id="emplist"></div>';
+  pintarEmpLista();
+  const qe = el("empq2");
+  if (qe) qe.addEventListener("input", (e) => { empQ = e.target.value; pintarEmpLista(); });
+}
+function pintarEmpLista() {
+  const l = mEmpLista(), box = el("emplist");
+  if (!box) return;
+  box.innerHTML = l.length ? '<div class="m-count">' + l.length + ' empresa' + (l.length !== 1 ? "s" : "") + '</div>' + l.map(c => mEmpCard(c)).join("")
+    : '<div class="card"><div class="empty">No hay empresas con ese filtro.</div></div>';
+}
+
+/* ══ CALENDARIO (móvil) ══ */
+function renderCalendarioM() {
+  if (U.calY == null) { U.calY = YEAR_NOW; U.calM = MONTH_NOW; }
+  const cy = U.calY, cm = U.calM;
+  const items = S.pays.filter(p => p.year === cy && p.month === cm);
+  const fcs = fhForecasts().filter(p => p.year === cy && p.month === cm);
+  const totalMes = items.reduce((t, p) => t + amtOf(p), 0), totalFc = fcs.reduce((t, p) => t + amtOf(p), 0);
+  const daysIn = new Date(cy, cm + 1, 0).getDate(), firstW = (new Date(cy, cm, 1).getDay() + 6) % 7;
+  const dR = {}, dF = {};
+  items.forEach(p => { if (p.day != null) dR[p.day] = (dR[p.day] || 0) + amtOf(p); });
+  fcs.forEach(p => { dF[p.day] = (dF[p.day] || 0) + amtOf(p); });
+  const maxV = Math.max(1, ...Object.keys(dR).map(k => dR[k]), ...Object.keys(dF).map(k => dF[k]));
+  let cells = "";
+  for (let i = 0; i < firstW; i++) cells += "<div></div>";
+  for (let d = 1; d <= daysIn; d++) {
+    const v = dR[d] || 0, fv = dF[d] || 0;
+    const today = cy === YEAR_NOW && cm === MONTH_NOW && d === DAY_NOW;
+    const st = v > 0 ? "background:rgba(var(--m-rgb)," + (0.18 + 0.72 * v / maxV).toFixed(2) + ");color:" + (v / maxV > 0.45 ? "#0b1220" : "var(--text)")
+      : fv > 0 ? "background:rgba(255,145,0," + (0.14 + 0.36 * fv / maxV).toFixed(2) + ")" : "";
+    cells += '<button class="mcal-d' + (v > 0 ? " r" : fv > 0 ? " f" : "") + (U.calSel === d ? " sel" : "") + (today ? " hoy" : "") + '" data-act="mcal-day" data-v="' + d + '" style="' + st + '">' + d +
+      (v > 0 && fv > 0 ? '<i></i>' : "") + '</button>';
+  }
+  const lista = (arr) => arr.map(p => '<div class="mcal-row">' + logo(p.name, 30) +
+    '<div class="mcal-n"><b>' + esc(p.name) + '</b><span>' + (p.day != null ? WEEKDAY[new Date(p.year, p.month, p.day).getDay()].slice(0, 3) + " " + p.day : "sin día") +
+      (p.fc ? ' · <em>previsto' + (p.kind === "Special" ? " extra" : "") + '</em>' : "") + '</span></div>' +
+    '<div class="mcal-v" style="color:' + (p.fc ? "#ff9100" : "var(--m)") + '">' + money(amtOf(p)) + '</div></div>').join("");
+  const sel = U.calSel;
+  const delDia = sel != null ? items.concat(fcs).filter(p => p.day === sel) : null;
+  const todos = items.concat(fcs).sort((a, b) => (a.day || 99) - (b.day || 99));
+  el("app").innerHTML =
+    '<div class="card mcal">' +
+      '<div class="mcal-nav"><button data-act="mcal-nav" data-v="-1" aria-label="Mes anterior">‹</button>' +
+        '<div><b>' + MESES_LARGO[cm] + '</b> ' + cy + '</div>' +
+        '<button data-act="mcal-nav" data-v="1" aria-label="Mes siguiente">›</button></div>' +
+      '<div class="mcal-pills"><span class="pz-pill" style="color:var(--m);border-color:rgba(var(--m-rgb),.4)">' + money(totalMes, 0) + ' · ' + items.length + ' cobros</span>' +
+        (fcs.length ? '<span class="pz-pill" style="color:#ff9100;border-color:rgba(255,145,0,.4)">+' + money(totalFc, 0) + ' previsto · ' + fcs.length + '</span>' : "") + '</div>' +
+      '<div class="mcal-g">' + DOW.map(d => '<div class="mcal-w">' + d + '</div>').join("") + cells + '</div>' +
+      '<div class="mcal-leg"><span><i style="background:var(--m)"></i>Cobrado</span><span><i style="background:#ff9100"></i>Previsto (Financial Hub)</span></div>' +
+    '</div>' +
+    '<div class="card"><div class="ctitle">' + (sel != null ? WEEKDAY[new Date(cy, cm, sel).getDay()] + ' ' + sel + ' ' + MESES_LARGO[cm].toLowerCase() +
+        '<button class="sp" data-act="mcal-day" data-v="' + sel + '" style="color:var(--accent)">Ver todo el mes</button>' : 'Todo ' + MESES_LARGO[cm].toLowerCase()) + '</div>' +
+      ((sel != null ? delDia : todos).length ? lista(sel != null ? delDia : todos) : '<div class="empty">' + (sel != null ? "Nada este día." : "Sin cobros este mes.") + '</div>') +
+    '</div>';
+}
+
+/* ══ PREVISIÓN (móvil) ══ */
+function renderPrevisionM() {
+  const f = window.DT_FH || {};
+  const dp = dashProyeccion();
+  const base = dp ? dp.base : Math.round(S.pays.filter(p => p.year === YEAR_NOW).reduce((t, p) => t + num(p.gross), 0));
+  const auto = dp ? dp.crec : null;
+  const isAuto = U.prevGrowthMode === "auto" && auto != null;
+  const growth = isAuto ? auto : U.prevGrowth, goal = U.prevGoal;
+  const useFh = f.y2026 && Math.abs(base - Math.round(f.y2026.g)) < 1;
+  const y0 = 2026, rows = [];
+  let amt = base, yr = y0;
+  for (let i = 0; i < 80 && amt < goal; i++) {
+    rows.push({ year: yr, amount: amt, fh: useFh && yr <= 2028 });
+    amt = amt * (1 + growth / 100); yr++;
+    if (useFh && yr === 2027) amt = f.y2027.g; else if (useFh && yr === 2028) amt = f.y2028.g;
+  }
+  rows.push({ year: yr, amount: amt, fh: useFh && yr <= 2028 });
+  const last = rows[rows.length - 1], reached = last.amount >= goal && goal > 0;
+  const ps = pagosSiguiente(), yc = yearCol(ps.year);
+  const maxM = Math.max(1, ...ps.meses.map(m => m.v));
+  el("app").innerHTML =
+    '<div class="kgrid">' +
+      '<div class="kpi"><div class="kpi-lab">Base ' + y0 + '</div><div class="kpi-val" style="color:#ff9100">' + money(base, 0) + '</div><div class="kpi-nm">' + money(base / 12, 0) + ' /mes</div></div>' +
+      '<div class="kpi kpay" data-act="mprev-growth"><div class="kpi-lab">Crecimiento ✎</div><div class="kpi-val k-cyan">+' + growth + '%</div><div class="kpi-nm">' + (isAuto ? "el del Dashboard" : "a mano") + '</div></div>' +
+      '<div class="kpi kpay" data-act="mprev-goal"><div class="kpi-lab">Objetivo ✎</div><div class="kpi-val" style="color:var(--gold)">' + last.year + '</div><div class="kpi-nm">' + money(goal, 0) + ' / año</div></div>' +
+      '<div class="kpi"><div class="kpi-lab">Años hasta objetivo</div><div class="kpi-val" style="color:' + (reached ? "var(--green)" : "#ff5b6e") + '">' + (reached ? (last.year - y0) : "> " + (last.year - y0)) + '</div><div class="kpi-nm">desde ' + y0 + '</div></div>' +
+    '</div>' +
+    (!isAuto && auto != null ? '<button class="btn gho" data-act="mprev-auto" style="margin:0 0 12px">↺ Usar el crecimiento del Dashboard (+' + auto + '%)</button>' : "") +
+    '<div class="card"><div class="ctitle">Comparativa anual</div>' +
+      '<div id="m-cmp-head" class="cmp-head m"></div>' +
+      '<div class="cbox" style="height:230px"><canvas id="m-ch-cmp"></canvas></div>' +
+      '<div class="pz-note" style="margin-top:8px">Rayado: estimado con el consenso de Financial Hub (' + String(f.asOf || "").split("-").reverse().join("/") + '). ' + (S.mode === "bruto" ? "Bruto" : "Neto") + '.</div></div>' +
+    '<div class="card"><div class="ctitle">Pagos previstos ' + ps.year + '<span class="sp" style="color:' + yc.solid + '">' + money(ps.total, 0) + '</span></div>' +
+      '<div class="pz-note" style="margin:-4px 0 10px">Media ' + money(ps.total / 12, 0) + ' al mes. Toca un mes para ver las empresas.</div>' +
+      ps.meses.map((m, i) => { const ab = U.openNext === i, emp = Object.keys(m.emp).sort((a, b) => m.emp[b] - m.emp[a]);
+        return '<div class="nx-row' + (ab ? " open" : "") + '" data-act="mnext" data-v="' + i + '">' +
+          '<span class="nx-m">' + MESES[i] + '</span>' +
+          '<span class="nx-bar"><i style="width:' + (m.v / maxM * 100).toFixed(1) + '%;--c:' + yc.solid + '"></i></span>' +
+          '<span class="nx-v">' + (m.v > 0 ? money(m.v, 0) : "—") + '</span></div>' +
+          (ab && emp.length ? '<div class="nx-emp">' + emp.map(n => '<div><span>' + logo(n, 20) + esc(n) + '</span><b>' + money(m.emp[n]) + '</b></div>').join("") + '</div>' : "");
+      }).join("") +
+      '<div class="pz-note" style="margin-top:10px">Reparto de tus cobros de ' + YEAR_NOW + ' (cobrados y previstos) de las empresas que sigues teniendo' + (ps.fh ? ', ajustado al total que estima Financial Hub' : '') + '.</div></div>' +
+    '<div class="card"><div class="ctitle">Proyección hasta el objetivo</div>' +
+      '<div class="cbox" style="height:200px"><canvas id="m-ch-prev"></canvas></div>' +
+      '<div class="pt-m">' + rows.map((r, i) => { const pc = Math.min(100, r.amount / goal * 100), win = i === rows.length - 1 && reached;
+        return '<div class="ptm-row' + (win ? " win" : "") + '"><span class="ptm-y">' + r.year + (win ? " 🏆" : "") + '</span>' +
+          '<span class="ptm-v" style="color:' + (r.fh ? "#ff9100" : win ? "var(--gold)" : "var(--text)") + '">' + money(r.amount, 0) + '</span>' +
+          '<span class="ptm-p"><i style="width:' + pc.toFixed(1) + '%;background:' + (win ? "var(--gold)" : r.fh ? "#ff9100" : "var(--accent)") + '"></i></span>' +
+          '<span class="ptm-pc">' + pc.toFixed(0) + '%</span></div>'; }).join("") + '</div>' +
+      '<div class="pz-note" style="margin-top:8px">' + (useFh ? "2026-2028 de Financial Hub; después, " : "") + '+' + growth + '% al año. Bruto.</div></div>';
+  comparativaAnual("m-ch-cmp", "m-cmp-head", true);
+  chart("m-ch-prev", {
+    type: "bar",
+    data: { labels: rows.map(r => String(r.year).slice(2)), datasets: [
+      { type: "line", data: rows.map(() => goal), borderColor: "#ff1744", borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, fill: false, order: 0 },
+      { type: "bar", data: rows.map(r => r.amount), order: 1, borderRadius: 4, maxBarThickness: 22,
+        backgroundColor: (c) => c.dataIndex === rows.length - 1 && reached ? GOLD_BAR(c) : rows[c.dataIndex] && rows[c.dataIndex].fh ? grad(c.chart.ctx, c.chart.chartArea, "#ffb74d", "#e65100") : CYAN_BAR(c) }] },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: Object.assign({}, TT, { filter: (i) => i.datasetIndex === 1,
+        callbacks: { title: (i) => rows[i[0].dataIndex].year, label: (i) => money(i.raw, 0) } }) },
+      scales: { x: Object.assign({}, XA, { ticks: { color: "#6d8fb0", font: { size: 9 }, maxRotation: 0, autoSkip: true } }), y: YA } }
+  });
+}
+function sheetNum(tit, sub, val, act) {
+  openSheet('<h3>' + tit + '</h3><div class="sub">' + sub + '</div>' +
+    '<div class="fg"><input id="n-val" type="text" inputmode="decimal" value="' + val + '"></div>' +
+    '<button class="btn pri" data-act="' + act + '">Guardar</button><button class="btn gho" data-act="cerrar">Cancelar</button>');
+  setTimeout(() => { const e = el("n-val"); if (e) { e.focus(); e.select(); } }, 260);
+}
+
+/* ══ POR AÑO (móvil) ══ */
+function renderAnualM() {
+  const by = {};
+  S.pays.forEach(p => {
+    const y = by[p.year] = by[p.year] || { year: p.year, v: 0, comp: {} };
+    const a = amtOf(p); y.v += a; y.comp[p.name] = (y.comp[p.name] || 0) + a;
+  });
+  const data = Object.keys(by).map(k => by[k]).sort((a, b) => a.year - b.year);
+  const grand = data.reduce((t, y) => t + y.v, 0);
+  const modo = U.anualM || "anual";
+  let g = "";
+  if (data.length >= 2) { const l = data[data.length - 1], pv = data[data.length - 2];
+    if (pv.v) { const x = (l.v - pv.v) / pv.v; g = '<span class="pz-pill" style="color:' + (x >= 0 ? "var(--green)" : "#ff5b6e") + '">' + (x >= 0 ? "▲ +" : "▼ ") + (x * 100).toFixed(1) + '% vs ' + pv.year + '</span>'; } }
+  if (!U.openYearM) U.openYearM = [];
+  el("app").innerHTML =
+    '<div class="card"><div class="ctitle">Dividendos por ' + (modo === "mensual" ? "mes" : "año") +
+      '<div class="seg"><button data-act="manual" data-v="mensual" class="' + (modo === "mensual" ? "on" : "") + '">Mes</button>' +
+      '<button data-act="manual" data-v="anual" class="' + (modo === "anual" ? "on" : "") + '">Año</button></div></div>' +
+      '<div class="mcal-pills"><span class="pz-pill" style="color:var(--m)">Total ' + money(grand, 0) + '</span>' + g + '</div>' +
+      '<div class="cbox" style="height:220px"><canvas id="m-ch-anual"></canvas></div></div>' +
+    data.slice().reverse().map(y => {
+      const all = Object.keys(y.comp).map(n => ({ n: n, v: y.comp[n] })).sort((a, b) => b.v - a.v);
+      const ab = U.openYearM.indexOf(y.year) >= 0, list = ab ? all : all.slice(0, 5), yc = yearCol(y.year);
+      return '<div class="card ycard" style="border-color:rgba(' + yc.rgb + ',.35)">' +
+        '<div class="yc-top"><b style="color:' + yc.solid + '">' + y.year + '</b>' + (y.year === YEAR_NOW ? '<span class="pz-pill" style="color:' + yc.solid + '">Año actual</span>' : "") + '</div>' +
+        '<div class="yc-big">' + money(y.v) + '</div><div class="pz-note">' + all.length + ' empresas · ' + S.mode + '</div>' +
+        '<div class="yc-list">' + list.map((c, i) => '<div><span><em>' + (i + 1) + '</em>' + esc(c.n) + '</span><b>' + money(c.v) + '</b></div>').join("") + '</div>' +
+        (all.length > 5 ? '<button class="mc-link" data-act="myear" data-v="' + y.year + '">' + (ab ? "Ver solo el top 5 ▲" : "Ver todas (" + all.length + ") ▼") + '</button>' : "") +
+      '</div>';
+    }).join("");
+  if (modo === "anual") {
+    chart("m-ch-anual", { type: "bar", plugins: [BarValues],
+      data: { labels: data.map(y => String(y.year)), datasets: [{ data: data.map(y => y.v), borderRadius: 6, maxBarThickness: 64,
+        backgroundColor: (c) => grad(c.chart.ctx, c.chart.chartArea, yearCol(data[c.dataIndex].year).top, yearCol(data[c.dataIndex].year).bot) }] },
+      options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } },
+        plugins: { legend: { display: false }, barValues: { fmt: (v) => money(v, 0) }, tooltip: Object.assign({}, TT, { callbacks: { label: (i) => money(i.raw) } }) },
+        scales: { x: XA, y: YA } } });
+  } else {
+    chart("m-ch-anual", { type: "bar",
+      data: { labels: MESES.map(m => m[0]), datasets: data.map(y => ({ label: String(y.year),
+        data: MESES.map((_, i) => S.pays.filter(p => p.year === y.year && p.month === i).reduce((t, p) => t + amtOf(p), 0)),
+        backgroundColor: yearCol(y.year).solid, borderRadius: 2, maxBarThickness: 9 })) },
+      options: { responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: "top", labels: { color: "#6d8fb0", boxWidth: 8, boxHeight: 8, font: { size: 10 } } },
+          tooltip: Object.assign({}, TT, { displayColors: true, callbacks: { title: (i) => MESES_LARGO[i[0].dataIndex], label: (i) => i.dataset.label + ": " + money(i.raw) } }) },
+        scales: { x: XA, y: YA } } });
+  }
 }
 /* ── PESO (móvil): cuánto pesa cada posición en la cartera ── */
 function renderPesoM() {
@@ -2714,7 +2932,23 @@ function accion(t) {
     const c = Object.assign({}, S.cats);
     if (c[n] === k) delete c[n]; else c[n] = k;
     S.cats = c; save(); render(); return; }
-  if (a === "vista") { U.view = val; empQ = ""; window.scrollTo(0, 0); render(); return; }
+  if (a === "vista") { U.view = val; empQ = ""; U.calSel = null; window.scrollTo(0, 0); render(); return; }
+  if (a === "mefil") { U.empFilter = val; saveLocal(); render(); return; }
+  if (a === "mesort") { U.empSort = val; saveLocal(); render(); return; }
+  if (a === "mcal-nav") { let m = U.calM + Number(val), y = U.calY; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; }
+    U.calM = m; U.calY = y; U.calSel = null; render(); return; }
+  if (a === "mcal-day") { const d = Number(val); U.calSel = U.calSel === d ? null : d; render(); return; }
+  if (a === "mnext") { const i = Number(val); U.openNext = U.openNext === i ? null : i; render(); return; }
+  if (a === "manual") { U.anualM = val; render(); return; }
+  if (a === "myear") { const y = Number(val); U.openYearM = U.openYearM || [];
+    U.openYearM = U.openYearM.indexOf(y) >= 0 ? U.openYearM.filter(x => x !== y) : U.openYearM.concat([y]); render(); return; }
+  if (a === "mprev-auto") { U.prevGrowthMode = "auto"; saveLocal(); render(); return; }
+  if (a === "mprev-growth") { sheetNum("Crecimiento anual", "A qué ritmo esperas que crezcan tus dividendos cada año (%)", U.prevGrowth, "mprev-growth-ok"); return; }
+  if (a === "mprev-goal") { sheetNum("Objetivo anual", "Cuánto quieres llegar a cobrar en dividendos al año (€)", U.prevGoal, "mprev-goal-ok"); return; }
+  if (a === "mprev-growth-ok" || a === "mprev-goal-ok") { const n = parseFloat(String(vn("n-val")).replace(",", "."));
+    if (isNaN(n) || (a === "mprev-goal-ok" && n <= 0)) { toast("Escribe un número"); return; }
+    if (a === "mprev-growth-ok") { U.prevGrowth = n; U.prevGrowthMode = "manual"; } else U.prevGoal = Math.round(n);
+    saveLocal(); closeSheet(); render(); return; }
   if (a === "mes") {
     const k = Number(val), i = U.openM.indexOf(k);
     U.openM = i >= 0 ? U.openM.filter(x => x !== k) : U.openM.concat([k]);
@@ -3630,6 +3864,83 @@ button.ab-logo:active{transform:scale(.94);}
 
 .hero.uni{border-color:rgba(var(--hc,var(--m-rgb)),.45);box-shadow:0 0 34px rgba(var(--hc,var(--m-rgb)),.14);
   background:linear-gradient(155deg,rgba(var(--hc,var(--m-rgb)),.10),var(--surface) 62%);}
+
+/* ══ 7 pestañas: fila deslizable ══ */
+.vtabs{overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;gap:7px;padding-right:14px;}
+.vtabs::-webkit-scrollbar{display:none;}
+.vtabs button{flex:0 0 auto !important;min-width:0;padding:8px 13px !important;letter-spacing:.4px;scroll-snap-align:center;white-space:nowrap;}
+/* empresas */
+.m-sticky{margin-bottom:6px;}
+.m-sticky .search{margin-bottom:10px;}
+.fchip i{font-style:normal;opacity:.6;margin-left:3px;font-family:'JetBrains Mono';font-size:11px;}
+.filters.sorts{align-items:center;padding-bottom:6px;}
+.filters .slab{flex-shrink:0;font-size:9.5px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-right:2px;}
+.fchip.sm{padding:6px 11px;font-size:11px;}
+.m-count{font-size:11px;color:var(--muted);font-weight:700;margin:2px 2px 8px;}
+/* calendario */
+.mcal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.mcal-nav div{font-size:17px;color:var(--muted);font-weight:700;}
+.mcal-nav div b{color:var(--text);font-weight:800;}
+.mcal-nav button{width:42px;height:42px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:22px;line-height:1;}
+.mcal-pills{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
+.mcal-g{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+.mcal-w{text-align:center;font-size:10px;font-weight:800;color:var(--muted);padding-bottom:3px;}
+.mcal-d{position:relative;aspect-ratio:1/1;min-height:38px;border-radius:10px;border:1px solid transparent;background:var(--surface2);
+  color:var(--muted);font:700 13px 'Inter',sans-serif;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;}
+.mcal-d.r,.mcal-d.f{color:var(--text);}
+.mcal-d.f{border-color:rgba(255,145,0,.55);border-style:dashed;}
+.mcal-d.hoy{border-color:var(--accent);border-style:solid;}
+.mcal-d.sel{outline:2px solid #fff;outline-offset:1px;}
+.mcal-d i{position:absolute;bottom:4px;width:5px;height:5px;border-radius:50%;background:#ff9100;}
+.mcal-leg{display:flex;gap:16px;justify-content:center;margin-top:12px;font-size:11px;color:var(--muted);font-weight:600;}
+.mcal-leg span{display:flex;align-items:center;gap:6px;}
+.mcal-leg i{width:10px;height:10px;border-radius:3px;display:inline-block;}
+.mcal-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-top:1px solid var(--border);}
+.mcal-row:first-of-type{border-top:0;}
+.mcal-n{flex:1;min-width:0;}
+.mcal-n b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.mcal-n span{font-size:11px;color:var(--muted);}
+.mcal-n em{color:#ff9100;font-style:normal;font-weight:700;}
+.mcal-v{font-family:'JetBrains Mono';font-weight:700;font-size:14px;flex-shrink:0;}
+/* previsión */
+.kpi-nm{font-size:10px;font-weight:700;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cbox{position:relative;width:100%;}
+.cmp-head.m{display:grid;grid-template-columns:1fr 1fr;gap:10px 8px;margin:2px 0 10px;text-align:center;}
+.cmp-head.m .cmp-y{font:700 10.5px 'JetBrains Mono',monospace;color:var(--muted);display:flex;align-items:center;justify-content:center;gap:5px;}
+.cmp-head.m .cmp-y i{width:8px;height:8px;border-radius:2px;display:inline-block;}
+.cmp-head.m .cmp-v{font:800 19px 'Inter',sans-serif;letter-spacing:-.4px;margin-top:2px;}
+.cmp-head.m .cmp-s{font:600 9.5px 'JetBrains Mono',monospace;color:var(--muted);margin-top:2px;line-height:1.35;}
+.cmp-head.m .g-up{color:#00e676}.cmp-head.m .g-dn{color:#ff5b6e}
+.cmp-head.m .cmp-leg{grid-column:1/-1;display:flex;justify-content:center;gap:14px;font:600 10px 'JetBrains Mono',monospace;color:var(--text);}
+.cmp-head.m .cmp-leg span{display:flex;align-items:center;gap:5px}
+.cmp-head.m .sw{width:11px;height:11px;border-radius:3px;display:inline-block;border:1.5px solid #9fb4c8;}
+.cmp-head.m .sw.sol{background:#9fb4c8}.cmp-head.m .sw.str{background:repeating-linear-gradient(135deg,#9fb4c8 0 2px,transparent 2px 5px)}
+.nx-row{display:grid;grid-template-columns:34px 1fr 64px;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--border);-webkit-tap-highlight-color:transparent;}
+.nx-row.open{background:rgba(255,255,255,.03);}
+.nx-m{font-size:12px;font-weight:800;color:var(--muted);}
+.nx-bar{height:10px;border-radius:5px;background:var(--surface2);overflow:hidden;}
+.nx-bar i{display:block;height:100%;border-radius:5px;background:repeating-linear-gradient(135deg,var(--c) 0 3px,transparent 3px 6px);box-shadow:inset 0 0 0 1.5px var(--c);}
+.nx-v{font-family:'JetBrains Mono';font-weight:700;font-size:13px;text-align:right;}
+.nx-emp{padding:2px 2px 10px 46px;}
+.nx-emp div{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:4px 0;}
+.nx-emp span{display:flex;align-items:center;gap:7px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nx-emp b{font-family:'JetBrains Mono';font-size:12px;flex-shrink:0;padding-left:8px;}
+.pt-m{margin-top:10px;}
+.ptm-row{display:grid;grid-template-columns:52px 70px 1fr 36px;align-items:center;gap:8px;padding:5px 0;font-size:12px;}
+.ptm-row.win{font-weight:800;}
+.ptm-y,.ptm-v,.ptm-pc{font-family:'JetBrains Mono';font-weight:700;}
+.ptm-pc{text-align:right;color:var(--muted);font-size:11px;}
+.ptm-p{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden;}
+.ptm-p i{display:block;height:100%;border-radius:3px;}
+/* por año */
+.ycard .yc-top{display:flex;align-items:center;justify-content:space-between;}
+.ycard .yc-top b{font-size:18px;font-weight:800;}
+.ycard .yc-big{font-family:'JetBrains Mono';font-size:26px;font-weight:700;color:var(--m);margin:6px 0 2px;}
+.yc-list{margin-top:10px;border-top:1px solid var(--border);padding-top:6px;}
+.yc-list div{display:flex;justify-content:space-between;font-size:12.5px;padding:5px 0;}
+.yc-list span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.yc-list em{font-style:normal;font-family:'JetBrains Mono';color:var(--muted);display:inline-block;width:20px;}
+.yc-list b{font-family:'JetBrains Mono';flex-shrink:0;padding-left:8px;}
 `;
 const HTML_DESK = `<header class="header">
   <div class="header-brand">
@@ -3692,7 +4003,11 @@ const HTML_MOB  = `<header class="appbar">
 <nav class="vtabs" id="vtabs">
   <button class="on" data-act="vista" data-v="resumen">Resumen</button>
   <button data-act="vista" data-v="cobros">Cobros</button>
+  <button data-act="vista" data-v="empresas">Empresas</button>
   <button data-act="vista" data-v="peso">Peso</button>
+  <button data-act="vista" data-v="calendario">Calendario</button>
+  <button data-act="vista" data-v="prevision">Previsión</button>
+  <button data-act="vista" data-v="anual">Por año</button>
 </nav>
 
 <main id="app"></main>
